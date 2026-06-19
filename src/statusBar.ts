@@ -10,9 +10,13 @@ export enum ProviderStatus {
  * Manages the VS Code Status Bar item for the Custom LLM Provider.
  */
 export class StatusBarManager implements vscode.Disposable {
+    public static instance: StatusBarManager | undefined;
     private statusBarItem: vscode.StatusBarItem;
+    private lastStatus: ProviderStatus = ProviderStatus.Fetching;
+    private lastModelCount: number = 0;
 
     constructor() {
+        StatusBarManager.instance = this;
         this.statusBarItem = vscode.window.createStatusBarItem(
             vscode.StatusBarAlignment.Right,
             100
@@ -28,6 +32,9 @@ export class StatusBarManager implements vscode.Disposable {
      * @param modelCount Optional number of registered models.
      */
     public update(status: ProviderStatus, modelCount: number = 0): void {
+        this.lastStatus = status;
+        this.lastModelCount = modelCount;
+
         switch (status) {
             case ProviderStatus.Ready:
                 this.statusBarItem.text = `$(check) Custom LLM: ${modelCount} Models`;
@@ -47,7 +54,28 @@ export class StatusBarManager implements vscode.Disposable {
         }
     }
 
+    /**
+     * Displays a temporary cooldown/delay warning on the status bar.
+     * @param remainingMs Remaining milliseconds.
+     */
+    public showCooldown(remainingMs: number): void {
+        const seconds = remainingMs / 1000;
+        this.statusBarItem.text = `$(watch) Custom LLM: Delay ${seconds.toFixed(1)}s`;
+        this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+        this.statusBarItem.tooltip = `Delaying request to respect cooldown (rate limit).`;
+    }
+
+    /**
+     * Restores the status bar to its last non-cooldown state.
+     */
+    public restore(): void {
+        this.update(this.lastStatus, this.lastModelCount);
+    }
+
     dispose(): void {
+        if (StatusBarManager.instance === this) {
+            StatusBarManager.instance = undefined;
+        }
         this.statusBarItem.dispose();
     }
 }

@@ -2,7 +2,7 @@
   "name": "custom-llm-provider",
   "displayName": "Custom LLM Provider for Copilot Chat",
   "description": "Custom LLM provider that auto-fetches models from OpenAI-compatible endpoints",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "custom",
   "repository": {
     "type": "git",

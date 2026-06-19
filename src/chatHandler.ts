@@ -4,6 +4,7 @@ import { URL } from 'url';
 import * as vscode from 'vscode';
 import { ModelCapabilities } from './types';
 import { ToolAdapter } from './toolAdapter';
+import { StatusBarManager } from './statusBar';
 
 /**
  * Interface for OpenAI-compatible chat messages.
@@ -141,7 +142,29 @@ export class ChatHandler {
     }
     const elapsed = Date.now() - ChatHandler.lastRequestTime;
     if (elapsed < delay) {
-      await new Promise<void>((r) => setTimeout(r, delay - elapsed));
+      const waitTime = delay - elapsed;
+      if (waitTime > 1000) {
+        const statusBar = StatusBarManager.instance;
+        const endTime = Date.now() + waitTime;
+        
+        while (Date.now() < endTime) {
+          const remaining = endTime - Date.now();
+          if (remaining <= 0) {
+            break;
+          }
+          if (statusBar) {
+            statusBar.showCooldown(remaining);
+          }
+          // Sleep for 100ms
+          await new Promise<void>((r) => setTimeout(r, Math.min(100, remaining)));
+        }
+        
+        if (statusBar) {
+          statusBar.restore();
+        }
+      } else {
+        await new Promise<void>((r) => setTimeout(r, waitTime));
+      }
     }
     ChatHandler.lastRequestTime = Date.now();
   }
@@ -354,15 +377,15 @@ export class ChatHandler {
 
           if (delta.reasoning_content) {
             if (!this.startedThinking) {
-              yield new vscode.LanguageModelTextPart('\n\n> 💭 **Thinking Process:**\n> ');
+              yield new vscode.LanguageModelTextPart('\n\n<details>\n<summary>💭 Thinking Process</summary>\n\n');
               this.startedThinking = true;
             }
-            yield new vscode.LanguageModelTextPart(delta.reasoning_content.replace(/\n/g, '\n> '));
+            yield new vscode.LanguageModelTextPart(delta.reasoning_content);
             continue;
           }
 
           if (this.startedThinking && (delta.content || choice.finish_reason)) {
-            yield new vscode.LanguageModelTextPart('\n\n---\n\n');
+            yield new vscode.LanguageModelTextPart('\n\n</details>\n\n');
             this.startedThinking = false;
           }
 
@@ -431,7 +454,7 @@ export class ChatHandler {
 
     // Ensure thinking block is properly closed if stream ended abruptly
     if (this.startedThinking) {
-      yield new vscode.LanguageModelTextPart('\n\n---\n\n');
+      yield new vscode.LanguageModelTextPart('\n\n</details>\n\n');
       this.startedThinking = false;
     }
   }
