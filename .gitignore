@@ -1,0 +1,29 @@
+# Dependency directories
+node_modules/
+
+# Build outputs
+dist/
+
+# Package files
+*.vsix
+
+# VS Code test logs and environments
+.vscode-test/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+eslint-debug.log*
+package-lock.json
+
+# Local environment configuration files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
