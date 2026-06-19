@@ -11,7 +11,7 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
 - **Image/Vision Support**: Full support for `vscode.LanguageModelImagePart` (auto-conversion to Base64).
 - **Anti-Race Condition**: Strict sequential request queue for models with cooldowns.
 - **Tool/Function Calling**: Native support for VS Code Chat tools.
-- **Reasoning/Thinking**: Supports reasoning tokens and thinking budgets, rendered inside clean, collapsible `<details>` tags for VS Code Stable compatibility.
+- **Reasoning/Thinking**: Supports reasoning tokens and thinking budgets, rendered inside clean Markdown blockquotes.
 - **Request Delay Indicator**: Displays a real-time countdown on the status bar (e.g., `Delay 2.5s`) during active request cooldowns if the configured request delay is greater than 1 second.
 - **Auto-refresh** on a configurable interval.
 - **Re-registers on config change** — no restart needed.
