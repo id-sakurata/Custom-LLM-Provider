@@ -267,11 +267,21 @@ export class ModelRegistry implements vscode.Disposable {
       }
     }
 
-    return {
+    const merged = {
       ...globalFallback,
       ...apiCapabilities,
       ...userOverride
     };
+
+    // If thinking or reasoning is globally disabled, enforce it unless explicitly overridden/enabled
+    if (globalFallback.thinking === false && userOverride.thinking === undefined) {
+      merged.thinking = false;
+    }
+    if (globalFallback.reasoning === false && userOverride.reasoning === undefined) {
+      merged.reasoning = false;
+    }
+
+    return merged;
   }
 
   /**
