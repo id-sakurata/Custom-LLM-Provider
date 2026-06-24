@@ -21,7 +21,7 @@ export class StatusBarManager implements vscode.Disposable {
             vscode.StatusBarAlignment.Right,
             100
         );
-        this.statusBarItem.command = 'customLlmProvider.showStatus';
+        this.statusBarItem.command = 'customLlmProvider.refreshModels';
         this.update(ProviderStatus.Fetching);
         this.statusBarItem.show();
     }

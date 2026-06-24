@@ -15,6 +15,7 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
 - **Request Delay Indicator**: Displays a real-time countdown on the status bar (e.g., `Delay 2.5s`) during active request cooldowns if the configured request delay is greater than 1 second.
 - **Auto-refresh** on a configurable interval.
 - **Re-registers on config change** — no restart needed.
+- **Configurable Auto-Retry**: Retry failed requests with configurable count, delay, and backoff strategy (fixed/linear/exponential).
 
 ## Requirements
 
@@ -59,6 +60,19 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
   "customLlmProvider.reasoning": true,
   "customLlmProvider.reasoningEffort": "medium", // "low" | "medium" | "high"
 
+  // --- Auto-Retry Configuration ---
+  // Max retries for failed API requests (0 = disabled)
+  "customLlmProvider.maxRetries": 3,
+
+  // Base delay (ms) between retry attempts
+  "customLlmProvider.retryDelay": 1000,
+
+  // Backoff strategy: "fixed" | "linear" | "exponential"
+  "customLlmProvider.retryBackoff": "exponential",
+
+  // HTTP status codes that trigger a retry
+  "customLlmProvider.retryOnStatus": [429, 500, 502, 503, 504],
+
   // Per-model overrides (partial — only what differs from fallback)
   "customLlmProvider.modelOverrides": {
     "llava-1.6": {
@@ -88,6 +102,7 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
 2. Each returned model ID is registered via `vscode.lm.registerChatModelProvider`
 3. When Copilot Chat sends a request, the extension streams `POST /v1/chat/completions` using SSE
 4. Tool calls, vision, and reasoning are conditionally enabled based on capabilities config
+5. On HTTP failure (configurable status codes) or network error, the request is automatically retried with the configured backoff delay — retry only occurs if no content has been streamed yet, avoiding duplicate output
 
 ## Building
 

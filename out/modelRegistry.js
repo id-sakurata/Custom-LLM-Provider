@@ -98,7 +98,7 @@ class ModelRegistry {
                 if (!registered) {
                     throw vscode.LanguageModelError.NotFound(`Model ${model.id} not found`);
                 }
-                const handler = new chatHandler_1.ChatHandler(config_1.ConfigManager.chatEndpoint, config_1.ConfigManager.apiKey, registered.capabilities);
+                const handler = new chatHandler_1.ChatHandler(config_1.ConfigManager.chatEndpoint, config_1.ConfigManager.apiKey, registered.capabilities, self.outputChannel);
                 for await (const part of handler.sendRequest(messages, options.tools ?? [], model.id, token)) {
                     progress.report(part);
                 }
@@ -136,7 +136,7 @@ class ModelRegistry {
         this.statusBar.update(statusBar_1.ProviderStatus.Fetching);
         let fetchedModels = [];
         try {
-            fetchedModels = await (0, modelFetcher_1.fetchModelsFromEndpoint)(config_1.ConfigManager.modelsEndpoint, config_1.ConfigManager.apiKey);
+            fetchedModels = await (0, modelFetcher_1.fetchModelsFromEndpoint)(config_1.ConfigManager.modelsEndpoint, config_1.ConfigManager.apiKey, config_1.ConfigManager.retryConfig);
             this.outputChannel.appendLine(`[${timestamp()}] Fetched ${fetchedModels.length} model(s): ${fetchedModels.map(m => m.id).join(', ')}`);
         }
         catch (err) {
@@ -238,11 +238,19 @@ class ModelRegistry {
                 }
             }
         }
-        return {
+        const merged = {
             ...globalFallback,
             ...apiCapabilities,
             ...userOverride
         };
+        // If thinking or reasoning is globally disabled, enforce it unless explicitly overridden/enabled
+        if (globalFallback.thinking === false && userOverride.thinking === undefined) {
+            merged.thinking = false;
+        }
+        if (globalFallback.reasoning === false && userOverride.reasoning === undefined) {
+            merged.reasoning = false;
+        }
+        return merged;
     }
     /**
      * Schedules or reschedules the automatic model refresh timer.

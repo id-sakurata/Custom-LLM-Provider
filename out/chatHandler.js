@@ -39,14 +39,18 @@ const http = __importStar(require("http"));
 const url_1 = require("url");
 const vscode = __importStar(require("vscode"));
 const toolAdapter_1 = require("./toolAdapter");
+const statusBar_1 = require("./statusBar");
+const config_1 = require("./config");
+const retryHandler_1 = require("./retryHandler");
 /**
  * Handles chat requests and responses between VS Code and the LLM endpoint.
  */
 class ChatHandler {
-    constructor(chatEndpoint, apiKey, capabilities) {
+    constructor(chatEndpoint, apiKey, capabilities, outputChannel) {
         this.chatEndpoint = chatEndpoint;
         this.apiKey = apiKey;
         this.capabilities = capabilities;
+        this.outputChannel = outputChannel;
         this.startedThinking = false;
     }
     /**
@@ -97,11 +101,37 @@ class ChatHandler {
                 // DeepSeek / OpenRouter style: include_reasoning
                 body.include_reasoning = true;
             }
-            for await (const part of this.streamCompletion(body, token)) {
+            const retryConfig = config_1.ConfigManager.retryConfig;
+            const maxRetries = retryConfig.maxRetries;
+            let hasYieldedContent = false;
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
                 if (token.isCancellationRequested) {
                     break;
                 }
-                yield part;
+                try {
+                    let streamedAny = false;
+                    for await (const part of this.streamCompletion(body, token)) {
+                        streamedAny = true;
+                        hasYieldedContent = true;
+                        if (token.isCancellationRequested) {
+                            break;
+                        }
+                        yield part;
+                    }
+                    if (!streamedAny && !token.isCancellationRequested) {
+                        throw new Error('Empty response: stream completed with no content');
+                    }
+                    break;
+                }
+                catch (err) {
+                    if (hasYieldedContent || attempt >= maxRetries || !(err instanceof Error) || !(0, retryHandler_1.isRetryableHttpError)(err, retryConfig.retryOnStatus)) {
+                        throw err;
+                    }
+                    const delay = (0, retryHandler_1.calculateDelay)(attempt, retryConfig);
+                    this.outputChannel?.appendLine(`[${(0, retryHandler_1.timestamp)()}] Retry ${attempt + 1}/${maxRetries} after: ${err.message}, waiting ${delay}ms`);
+                    yield new vscode.LanguageModelTextPart(`\n\n> ⏳ Request failed (${err.message}). Retrying in ${(delay / 1000).toFixed(1)}s... (${attempt + 1}/${maxRetries})\n\n`);
+                    await new Promise((r) => setTimeout(r, delay));
+                }
             }
         }
         finally {
@@ -120,7 +150,28 @@ class ChatHandler {
         }
         const elapsed = Date.now() - ChatHandler.lastRequestTime;
         if (elapsed < delay) {
-            await new Promise((r) => setTimeout(r, delay - elapsed));
+            const waitTime = delay - elapsed;
+            if (waitTime > 1000) {
+                const statusBar = statusBar_1.StatusBarManager.instance;
+                const endTime = Date.now() + waitTime;
+                while (Date.now() < endTime) {
+                    const remaining = endTime - Date.now();
+                    if (remaining <= 0) {
+                        break;
+                    }
+                    if (statusBar) {
+                        statusBar.showCooldown(remaining);
+                    }
+                    // Sleep for 100ms
+                    await new Promise((r) => setTimeout(r, Math.min(100, remaining)));
+                }
+                if (statusBar) {
+                    statusBar.restore();
+                }
+            }
+            else {
+                await new Promise((r) => setTimeout(r, waitTime));
+            }
         }
         ChatHandler.lastRequestTime = Date.now();
     }
@@ -302,11 +353,13 @@ class ChatHandler {
                 for (const choice of chunk.choices) {
                     const delta = choice.delta;
                     if (delta.reasoning_content) {
-                        if (!this.startedThinking) {
-                            yield new vscode.LanguageModelTextPart('\n\n> 💭 **Thinking Process:**\n> ');
-                            this.startedThinking = true;
+                        if (this.capabilities.reasoning && this.capabilities.thinking) {
+                            if (!this.startedThinking) {
+                                yield new vscode.LanguageModelTextPart('\n\n> 💭 **Thinking Process:**\n> ');
+                                this.startedThinking = true;
+                            }
+                            yield new vscode.LanguageModelTextPart(delta.reasoning_content.replace(/\n/g, '\n> '));
                         }
-                        yield new vscode.LanguageModelTextPart(delta.reasoning_content.replace(/\n/g, '\n> '));
                         continue;
                     }
                     if (this.startedThinking && (delta.content || choice.finish_reason)) {

@@ -46,6 +46,9 @@ var ProviderStatus;
  */
 class StatusBarManager {
     constructor() {
+        this.lastStatus = ProviderStatus.Fetching;
+        this.lastModelCount = 0;
+        StatusBarManager.instance = this;
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
         this.statusBarItem.command = 'customLlmProvider.showStatus';
         this.update(ProviderStatus.Fetching);
@@ -57,6 +60,8 @@ class StatusBarManager {
      * @param modelCount Optional number of registered models.
      */
     update(status, modelCount = 0) {
+        this.lastStatus = status;
+        this.lastModelCount = modelCount;
         switch (status) {
             case ProviderStatus.Ready:
                 this.statusBarItem.text = `$(check) Custom LLM: ${modelCount} Models`;
@@ -75,7 +80,26 @@ class StatusBarManager {
                 break;
         }
     }
+    /**
+     * Displays a temporary cooldown/delay warning on the status bar.
+     * @param remainingMs Remaining milliseconds.
+     */
+    showCooldown(remainingMs) {
+        const seconds = remainingMs / 1000;
+        this.statusBarItem.text = `$(watch) Custom LLM: Delay ${seconds.toFixed(1)}s`;
+        this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+        this.statusBarItem.tooltip = `Delaying request to respect cooldown (rate limit).`;
+    }
+    /**
+     * Restores the status bar to its last non-cooldown state.
+     */
+    restore() {
+        this.update(this.lastStatus, this.lastModelCount);
+    }
     dispose() {
+        if (StatusBarManager.instance === this) {
+            StatusBarManager.instance = undefined;
+        }
         this.statusBarItem.dispose();
     }
 }

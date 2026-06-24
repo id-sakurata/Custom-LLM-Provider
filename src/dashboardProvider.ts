@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ModelRegistry } from './modelRegistry';
+import { ConfigManager } from './config';
 
 /**
  * Escapes HTML special characters to prevent XSS.
@@ -112,6 +113,28 @@ export class DashboardProvider {
                     <div class="stat-item">
                         <span class="stat-value">${status.additional}</span>
                         <span class="stat-label">Custom Config</span>
+                    </div>
+                </div>
+
+                <div class="retry-section">
+                    <h2>Retry Configuration</h2>
+                    <div class="stats">
+                        <div class="stat-item">
+                            <span class="stat-value">${ConfigManager.retryConfig.maxRetries}</span>
+                            <span class="stat-label">Max Retries</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${ConfigManager.retryConfig.retryDelay}ms</span>
+                            <span class="stat-label">Base Delay</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${ConfigManager.retryConfig.retryBackoff}</span>
+                            <span class="stat-label">Backoff</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">[${ConfigManager.retryConfig.retryOnStatus.join(', ')}]</span>
+                            <span class="stat-label">Retry Status Codes</span>
+                        </div>
                     </div>
                 </div>
 

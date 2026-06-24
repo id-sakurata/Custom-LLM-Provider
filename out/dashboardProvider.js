@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DashboardProvider = void 0;
 const vscode = __importStar(require("vscode"));
+const config_1 = require("./config");
 /**
  * Escapes HTML special characters to prevent XSS.
  */
@@ -129,6 +130,28 @@ class DashboardProvider {
                     <div class="stat-item">
                         <span class="stat-value">${status.additional}</span>
                         <span class="stat-label">Custom Config</span>
+                    </div>
+                </div>
+
+                <div class="retry-section">
+                    <h2>Retry Configuration</h2>
+                    <div class="stats">
+                        <div class="stat-item">
+                            <span class="stat-value">${config_1.ConfigManager.retryConfig.maxRetries}</span>
+                            <span class="stat-label">Max Retries</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${config_1.ConfigManager.retryConfig.retryDelay}ms</span>
+                            <span class="stat-label">Base Delay</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${config_1.ConfigManager.retryConfig.retryBackoff}</span>
+                            <span class="stat-label">Backoff</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">[${config_1.ConfigManager.retryConfig.retryOnStatus.join(', ')}]</span>
+                            <span class="stat-label">Retry Status Codes</span>
+                        </div>
                     </div>
                 </div>
 

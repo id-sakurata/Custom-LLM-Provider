@@ -2,7 +2,7 @@
   "name": "custom-llm-provider",
   "displayName": "Custom LLM Provider for Copilot Chat",
   "description": "Custom LLM provider that auto-fetches models from OpenAI-compatible endpoints",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "custom",
   "repository": {
     "type": "git",
@@ -194,6 +194,28 @@
               }
             }
           }
+        },
+        "customLlmProvider.maxRetries": {
+          "type": "number",
+          "default": 3,
+          "description": "Maximum number of retry attempts for failed API requests (0 = disabled)."
+        },
+        "customLlmProvider.retryDelay": {
+          "type": "number",
+          "default": 1000,
+          "description": "Base delay in milliseconds between retry attempts."
+        },
+        "customLlmProvider.retryBackoff": {
+          "type": "string",
+          "enum": ["fixed", "linear", "exponential"],
+          "default": "exponential",
+          "description": "Backoff strategy for retry delays."
+        },
+        "customLlmProvider.retryOnStatus": {
+          "type": "array",
+          "default": [429, 500, 502, 503, 504],
+          "description": "HTTP status codes that trigger a retry.",
+          "items": { "type": "number" }
         }
       }
     }

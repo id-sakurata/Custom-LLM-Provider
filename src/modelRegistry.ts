@@ -93,7 +93,8 @@ export class ModelRegistry implements vscode.Disposable {
         const handler = new ChatHandler(
           ConfigManager.chatEndpoint,
           ConfigManager.apiKey,
-          registered.capabilities
+          registered.capabilities,
+          self.outputChannel
         );
 
         for await (const part of handler.sendRequest(
@@ -145,7 +146,7 @@ export class ModelRegistry implements vscode.Disposable {
     let fetchedModels: FetchedModel[] = [];
 
     try {
-      fetchedModels = await fetchModelsFromEndpoint(ConfigManager.modelsEndpoint, ConfigManager.apiKey);
+      fetchedModels = await fetchModelsFromEndpoint(ConfigManager.modelsEndpoint, ConfigManager.apiKey, ConfigManager.retryConfig);
       this.outputChannel.appendLine(
         `[${timestamp()}] Fetched ${fetchedModels.length} model(s): ${fetchedModels.map(m => m.id).join(', ')}`
       );

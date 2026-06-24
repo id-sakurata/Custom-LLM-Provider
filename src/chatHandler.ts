@@ -5,6 +5,8 @@ import * as vscode from 'vscode';
 import { ModelCapabilities } from './types';
 import { ToolAdapter } from './toolAdapter';
 import { StatusBarManager } from './statusBar';
+import { ConfigManager } from './config';
+import { calculateDelay, isRetryableHttpError, timestamp } from './retryHandler';
 
 /**
  * Interface for OpenAI-compatible chat messages.
@@ -56,7 +58,8 @@ export class ChatHandler {
   constructor(
     private readonly chatEndpoint: string,
     private readonly apiKey: string,
-    private readonly capabilities: ModelCapabilities
+    private readonly capabilities: ModelCapabilities,
+    private readonly outputChannel?: vscode.OutputChannel
   ) {}
 
   /**
@@ -119,11 +122,40 @@ export class ChatHandler {
         body.include_reasoning = true;
       }
 
-      for await (const part of this.streamCompletion(body, token)) {
+      const retryConfig = ConfigManager.retryConfig;
+      const maxRetries = retryConfig.maxRetries;
+      let hasYieldedContent = false;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
         if (token.isCancellationRequested) {
           break;
         }
-        yield part;
+
+        try {
+          let streamedAny = false;
+          for await (const part of this.streamCompletion(body, token)) {
+            streamedAny = true;
+            hasYieldedContent = true;
+            if (token.isCancellationRequested) {
+              break;
+            }
+            yield part;
+          }
+          if (!streamedAny && !token.isCancellationRequested) {
+            throw new Error('Empty response: stream completed with no content');
+          }
+          break;
+        } catch (err) {
+          if (hasYieldedContent || attempt >= maxRetries || !(err instanceof Error) || !isRetryableHttpError(err, retryConfig.retryOnStatus)) {
+            throw err;
+          }
+
+          const delay = calculateDelay(attempt, retryConfig);
+          this.outputChannel?.appendLine(`[${timestamp()}] Retry ${attempt + 1}/${maxRetries} after: ${err.message}, waiting ${delay}ms`);
+          yield new vscode.LanguageModelTextPart(`\n\n> ⏳ Request failed (${err.message}). Retrying in ${(delay / 1000).toFixed(1)}s... (${attempt + 1}/${maxRetries})\n\n`);
+
+          await new Promise<void>((r) => setTimeout(r, delay));
+        }
       }
     } finally {
       // Release the queue after the request's initial delay/setup is done

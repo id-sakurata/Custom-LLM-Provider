@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ModelCapabilities, ToolFlavor } from './types';
+import { ModelCapabilities, ToolFlavor, RetryConfig } from './types';
 
 /**
  * Manages access to extension configuration settings.
@@ -81,5 +81,15 @@ export class ConfigManager {
   /**
    * Full URL for chat completions.
    */
+  static get retryConfig(): RetryConfig {
+    const c = this.cfg();
+    return {
+      maxRetries:    c.get<number>('maxRetries',    3),
+      retryDelay:    c.get<number>('retryDelay',    1000),
+      retryBackoff:  c.get<'fixed'|'linear'|'exponential'>('retryBackoff', 'exponential'),
+      retryOnStatus: c.get<number[]>('retryOnStatus', [429, 500, 502, 503, 504]),
+    };
+  }
+
   static get chatEndpoint(): string   { return `${this.endpoint}/v1/chat/completions`; }
 }

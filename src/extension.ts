@@ -118,6 +118,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           'customLlmProvider.reasoningEffort',
           'customLlmProvider.modelOverrides',
           'customLlmProvider.autoRefreshInterval',
+          'customLlmProvider.maxRetries',
+          'customLlmProvider.retryDelay',
+          'customLlmProvider.retryBackoff',
+          'customLlmProvider.retryOnStatus',
         ].some((key) => e.affectsConfiguration(key));
 
         if (affected) {

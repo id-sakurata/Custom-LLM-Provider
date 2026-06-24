@@ -103,6 +103,15 @@ class ConfigManager {
     /**
      * Full URL for chat completions.
      */
+    static get retryConfig() {
+        const c = this.cfg();
+        return {
+            maxRetries: c.get('maxRetries', 3),
+            retryDelay: c.get('retryDelay', 1000),
+            retryBackoff: c.get('retryBackoff', 'exponential'),
+            retryOnStatus: c.get('retryOnStatus', [429, 500, 502, 503, 504]),
+        };
+    }
     static get chatEndpoint() { return `${this.endpoint}/v1/chat/completions`; }
 }
 exports.ConfigManager = ConfigManager;

@@ -33,6 +33,13 @@ export interface ModelsResponse {
   data: FetchedModel[];
 }
 
+export interface RetryConfig {
+  maxRetries: number;
+  retryDelay: number;
+  retryBackoff: 'fixed' | 'linear' | 'exponential';
+  retryOnStatus: number[];
+}
+
 export interface RegisteredModel {
   id: string;
   capabilities: ModelCapabilities;
