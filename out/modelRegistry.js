@@ -98,8 +98,8 @@ class ModelRegistry {
                 if (!registered) {
                     throw vscode.LanguageModelError.NotFound(`Model ${model.id} not found`);
                 }
-                const handler = new chatHandler_1.ChatHandler(config_1.ConfigManager.chatEndpoint, config_1.ConfigManager.apiKey, registered.capabilities, self.outputChannel);
-                for await (const part of handler.sendRequest(messages, options.tools ?? [], model.id, token)) {
+                const handler = new chatHandler_1.ChatHandler(registered.chatEndpoint, registered.apiKey, registered.capabilities, self.outputChannel);
+                for await (const part of handler.sendRequest(messages, options.tools ?? [], registered.originalId, token)) {
                     progress.report(part);
                 }
             },
@@ -129,37 +129,9 @@ class ModelRegistry {
         };
     }
     /**
-     * Refreshes the list of models from the remote endpoint and additional configuration.
+     * Helper to filter model IDs against include and exclude pattern arrays.
      */
-    async refreshModels() {
-        this.outputChannel.appendLine(`[${timestamp()}] Refreshing models from ${config_1.ConfigManager.modelsEndpoint}...`);
-        this.statusBar.update(statusBar_1.ProviderStatus.Fetching);
-        let fetchedModels = [];
-        try {
-            fetchedModels = await (0, modelFetcher_1.fetchModelsFromEndpoint)(config_1.ConfigManager.modelsEndpoint, config_1.ConfigManager.apiKey, config_1.ConfigManager.retryConfig);
-            this.outputChannel.appendLine(`[${timestamp()}] Fetched ${fetchedModels.length} model(s): ${fetchedModels.map(m => m.id).join(', ')}`);
-        }
-        catch (err) {
-            this.outputChannel.appendLine(`[${timestamp()}] WARNING: ${err}`);
-            this.statusBar.update(statusBar_1.ProviderStatus.Error);
-            const retryAction = 'Retry';
-            const settingsAction = 'Open Settings';
-            vscode.window.showWarningMessage(`Custom LLM Provider: Could not fetch models — ${err}`, retryAction, settingsAction).then(selection => {
-                if (selection === retryAction) {
-                    this.refreshModels();
-                }
-                else if (selection === settingsAction) {
-                    vscode.commands.executeCommand('workbench.action.openSettings', 'customLlmProvider');
-                }
-            });
-            // We continue with additionalModels only if any
-        }
-        const fetchedIds = fetchedModels.map(m => m.id);
-        const additionalIds = config_1.ConfigManager.additionalModels;
-        let allIds = Array.from(new Set([...fetchedIds, ...additionalIds]));
-        // --- Filtering Logic ---
-        const include = config_1.ConfigManager.includeModels;
-        const exclude = config_1.ConfigManager.excludeModels;
+    filterModelIds(allIds, include, exclude) {
         function matches(id, pattern) {
             if (pattern.includes('*')) {
                 const regex = new RegExp('^' + pattern.split('*').map(s => s.replace(/[|\\{}()[\]^$+?.]/g, '\\$&')).join('.*') + '$');
@@ -167,34 +139,101 @@ class ModelRegistry {
             }
             return id === pattern;
         }
-        if (include.length > 0) {
-            allIds = allIds.filter(id => include.some(pat => matches(id, pat)));
+        let filtered = [...allIds];
+        if (include && include.length > 0) {
+            filtered = filtered.filter(id => include.some(pat => matches(id, pat)));
         }
-        if (exclude.length > 0) {
-            allIds = allIds.filter(id => !exclude.some(pat => matches(id, pat)));
+        if (exclude && exclude.length > 0) {
+            filtered = filtered.filter(id => !exclude.some(pat => matches(id, pat)));
         }
-        // -----------------------
-        if (allIds.length === 0) {
+        return filtered;
+    }
+    /**
+     * Refreshes the list of models from the remote endpoint and additional configuration.
+     */
+    async refreshModels() {
+        this.statusBar.update(statusBar_1.ProviderStatus.Fetching);
+        this.registeredModels.clear();
+        // 1. Fetch from primary endpoint
+        this.outputChannel.appendLine(`[${timestamp()}] Refreshing primary models from ${config_1.ConfigManager.modelsEndpoint}...`);
+        let primaryFetched = [];
+        try {
+            primaryFetched = await (0, modelFetcher_1.fetchModelsFromEndpoint)(config_1.ConfigManager.modelsEndpoint, config_1.ConfigManager.apiKey, config_1.ConfigManager.retryConfig);
+            this.outputChannel.appendLine(`[${timestamp()}] Primary endpoint fetched ${primaryFetched.length} model(s): ${primaryFetched.map(m => m.id).join(', ')}`);
+        }
+        catch (err) {
+            this.outputChannel.appendLine(`[${timestamp()}] WARNING: Primary endpoint fetch failed: ${err}`);
+            vscode.window.showWarningMessage(`Custom LLM Provider (Primary): Could not fetch models — ${err}`);
+        }
+        const primaryFetchedIds = primaryFetched.map(m => m.id);
+        const primaryAllIds = Array.from(new Set([...primaryFetchedIds, ...config_1.ConfigManager.additionalModels]));
+        const primaryFilteredIds = this.filterModelIds(primaryAllIds, config_1.ConfigManager.includeModels, config_1.ConfigManager.excludeModels);
+        for (const modelId of primaryFilteredIds) {
+            const source = primaryFetchedIds.includes(modelId) ? 'fetched' : 'additional';
+            const fetchedMeta = primaryFetched.find(m => m.id === modelId);
+            const capabilities = this.resolveCapabilities(modelId, config_1.ConfigManager.modelOverrides, fetchedMeta);
+            this.registeredModels.set(modelId, {
+                id: modelId,
+                originalId: modelId,
+                capabilities,
+                source,
+                chatEndpoint: config_1.ConfigManager.chatEndpoint,
+                apiKey: config_1.ConfigManager.apiKey
+            });
+            this.outputChannel.appendLine(`[${timestamp()}]   + [Primary] ${modelId} (${source}) ctx:${capabilities.maxInputTokens}/` +
+                `${capabilities.maxOutputTokens} tools:${capabilities.toolCalling} vision:${capabilities.vision}`);
+        }
+        // 2. Fetch from additional endpoints
+        const additionalEndpoints = config_1.ConfigManager.additionalEndpoints;
+        for (const endpoint of additionalEndpoints) {
+            if (!endpoint.id || !endpoint.url) {
+                continue;
+            }
+            const prefix = endpoint.id;
+            const cleanUrl = endpoint.url.replace(/\/$/, '');
+            const modelsUrl = `${cleanUrl}/v1/models`;
+            const chatEndpoint = `${cleanUrl}/v1/chat/completions`;
+            const apiKey = endpoint.apiKey || '';
+            const additionalModels = endpoint.additionalModels || endpoint.additional_models || [];
+            const includeModels = endpoint.includeModels || [];
+            const excludeModels = endpoint.excludeModels || [];
+            const overrides = endpoint.modelOverrides || endpoint.models_overrides || {};
+            this.outputChannel.appendLine(`[${timestamp()}] Refreshing models from additional endpoint '${prefix}' (${modelsUrl})...`);
+            let fetched = [];
+            try {
+                fetched = await (0, modelFetcher_1.fetchModelsFromEndpoint)(modelsUrl, apiKey, config_1.ConfigManager.retryConfig);
+                this.outputChannel.appendLine(`[${timestamp()}] Endpoint '${prefix}' fetched ${fetched.length} model(s): ${fetched.map(m => m.id).join(', ')}`);
+            }
+            catch (err) {
+                this.outputChannel.appendLine(`[${timestamp()}] WARNING: Endpoint '${prefix}' fetch failed: ${err}`);
+                vscode.window.showWarningMessage(`Custom LLM Provider (${prefix}): Could not fetch models — ${err}`);
+            }
+            const fetchedIds = fetched.map(m => m.id);
+            const allIds = Array.from(new Set([...fetchedIds, ...additionalModels]));
+            const filteredIds = this.filterModelIds(allIds, includeModels, excludeModels);
+            for (const modelId of filteredIds) {
+                const source = fetchedIds.includes(modelId) ? 'fetched' : 'additional';
+                const fetchedMeta = fetched.find(m => m.id === modelId);
+                const capabilities = this.resolveCapabilities(modelId, overrides, fetchedMeta);
+                const registeredId = `${prefix}:${modelId}`;
+                this.registeredModels.set(registeredId, {
+                    id: registeredId,
+                    originalId: modelId,
+                    capabilities,
+                    source,
+                    chatEndpoint,
+                    apiKey
+                });
+                this.outputChannel.appendLine(`[${timestamp()}]   + [${prefix}] ${registeredId} (${source}) ctx:${capabilities.maxInputTokens}/` +
+                    `${capabilities.maxOutputTokens} tools:${capabilities.toolCalling} vision:${capabilities.vision}`);
+            }
+        }
+        if (this.registeredModels.size === 0) {
             this.outputChannel.appendLine(`[${timestamp()}] No models to register.`);
             this.statusBar.update(statusBar_1.ProviderStatus.Error);
-            const addModelsAction = 'Add Models';
-            vscode.window.showWarningMessage('Custom LLM Provider: No models found. Check endpoint or add to additionalModels config.', addModelsAction).then(selection => {
-                if (selection === addModelsAction) {
-                    vscode.commands.executeCommand('workbench.action.openSettings', 'customLlmProvider.additionalModels');
-                }
-            });
-            this.registeredModels.clear();
+            vscode.window.showWarningMessage('Custom LLM Provider: No models found. Check endpoint or settings.');
             this._onDidChange.fire();
             return;
-        }
-        this.registeredModels.clear();
-        for (const modelId of allIds) {
-            const source = fetchedIds.includes(modelId) ? 'fetched' : 'additional';
-            const fetchedMeta = fetchedModels.find(m => m.id === modelId);
-            const capabilities = this.resolveCapabilities(modelId, fetchedMeta);
-            this.registeredModels.set(modelId, { id: modelId, capabilities, source });
-            this.outputChannel.appendLine(`[${timestamp()}]   + ${modelId} (${source}) ctx:${capabilities.maxInputTokens}/` +
-                `${capabilities.maxOutputTokens} tools:${capabilities.toolCalling} vision:${capabilities.vision}`);
         }
         // Notify VSCode that the model list changed
         this._onDidChange.fire();
@@ -208,9 +247,9 @@ class ModelRegistry {
      * 2. API Metadata (if available)
      * 3. Global Fallback Config
      */
-    resolveCapabilities(modelId, apiMeta) {
+    resolveCapabilities(modelId, overrides, apiMeta) {
         const globalFallback = config_1.ConfigManager.modelFallbackConfigs;
-        const userOverride = config_1.ConfigManager.modelOverrides[modelId] ?? {};
+        const userOverride = overrides[modelId] ?? {};
         // Extract capabilities from API metadata if present
         const apiCapabilities = {};
         if (apiMeta) {

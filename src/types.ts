@@ -40,8 +40,24 @@ export interface RetryConfig {
   retryOnStatus: number[];
 }
 
-export interface RegisteredModel {
+export interface AdditionalEndpointConfig {
   id: string;
+  url: string;
+  apiKey?: string;
+  includeModels?: string[];
+  excludeModels?: string[];
+  additionalModels?: string[];
+  additional_models?: string[]; // fallback for snake_case
+  modelOverrides?: Record<string, Partial<ModelCapabilities>>;
+  models_overrides?: Record<string, Partial<ModelCapabilities>>; // fallback for snake_case
+}
+
+export interface RegisteredModel {
+  id: string; // The registered ID in VS Code (possibly with prefix)
+  originalId: string; // The raw ID to send to the provider
   capabilities: ModelCapabilities;
   source: 'fetched' | 'additional';
+  chatEndpoint: string;
+  apiKey: string;
 }
+

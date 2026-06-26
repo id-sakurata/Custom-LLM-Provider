@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ModelCapabilities, ToolFlavor, RetryConfig } from './types';
+import { ModelCapabilities, ToolFlavor, RetryConfig, AdditionalEndpointConfig } from './types';
 
 /**
  * Manages access to extension configuration settings.
@@ -92,4 +92,11 @@ export class ConfigManager {
   }
 
   static get chatEndpoint(): string   { return `${this.endpoint}/v1/chat/completions`; }
+
+  /**
+   * Additional endpoints configured by the user.
+   */
+  static get additionalEndpoints(): AdditionalEndpointConfig[] {
+    return this.cfg().get<AdditionalEndpointConfig[]>('additionalEndpoints', []);
+  }
 }

@@ -2,7 +2,7 @@
   "name": "custom-llm-provider",
   "displayName": "Custom LLM Provider for Copilot Chat",
   "description": "Custom LLM provider that auto-fetches models from OpenAI-compatible endpoints",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "custom",
   "repository": {
     "type": "git",
@@ -216,6 +216,69 @@
           "default": [429, 500, 502, 503, 504],
           "description": "HTTP status codes that trigger a retry.",
           "items": { "type": "number" }
+        },
+        "customLlmProvider.additionalEndpoints": {
+          "type": "array",
+          "default": [],
+          "description": "Additional OpenAI-compatible endpoints with unique model prefixes.",
+          "items": {
+            "type": "object",
+            "required": ["id", "url"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for this endpoint, used as prefix for its models (e.g. 'ollama')"
+              },
+              "url": {
+                "type": "string",
+                "description": "Base URL of the OpenAI-compatible API (without /v1, e.g. http://localhost:11434)"
+              },
+              "apiKey": {
+                "type": "string",
+                "description": "API Key for authorization (optional)",
+                "default": ""
+              },
+              "includeModels": {
+                "type": "array",
+                "description": "Optional list of model IDs or wildcard patterns to include.",
+                "items": { "type": "string" }
+              },
+              "excludeModels": {
+                "type": "array",
+                "description": "Optional list of model IDs or wildcard patterns to exclude.",
+                "items": { "type": "string" }
+              },
+              "additionalModels": {
+                "type": "array",
+                "description": "Additional model IDs to register that may not appear in /v1/models.",
+                "items": { "type": "string" }
+              },
+              "modelOverrides": {
+                "type": "object",
+                "description": "Per-model capability overrides for this endpoint.",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "maxInputTokens": { "type": "number" },
+                    "maxOutputTokens": { "type": "number" },
+                    "requestDelay": { "type": "number" },
+                    "toolCalling": { "type": "boolean" },
+                    "toolFlavor": {
+                      "type": "string",
+                      "enum": ["openai-tools", "openai-functions", "text-based"]
+                    },
+                    "vision": { "type": "boolean" },
+                    "thinking": { "type": "boolean" },
+                    "reasoning": { "type": "boolean" },
+                    "reasoningEffort": {
+                      "type": "string",
+                      "enum": ["low", "medium", "high"]
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

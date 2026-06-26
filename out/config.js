@@ -113,6 +113,12 @@ class ConfigManager {
         };
     }
     static get chatEndpoint() { return `${this.endpoint}/v1/chat/completions`; }
+    /**
+     * Additional endpoints configured by the user.
+     */
+    static get additionalEndpoints() {
+        return this.cfg().get('additionalEndpoints', []);
+    }
 }
 exports.ConfigManager = ConfigManager;
 ConfigManager.S = 'customLlmProvider';

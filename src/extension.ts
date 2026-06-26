@@ -33,7 +33,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // 4. Register commands IMMEDIATELY
     context.subscriptions.push(
       vscode.commands.registerCommand('customLlmProvider.refreshModels', async () => {
-        outputChannel.show(true);
         if (registry) {
           await registry.refreshModels();
         }
@@ -122,6 +121,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           'customLlmProvider.retryDelay',
           'customLlmProvider.retryBackoff',
           'customLlmProvider.retryOnStatus',
+          'customLlmProvider.additionalEndpoints',
         ].some((key) => e.affectsConfiguration(key));
 
         if (affected) {

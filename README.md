@@ -4,6 +4,7 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
 
 ## Features
 
+- **Multi-Endpoint/Multi-Provider Support**: Configure multiple LLM providers (e.g., local Ollama and cloud-based DeepSeek) simultaneously with custom prefixes to avoid model name collisions.
 - **Auto-fetches models** from `GET /v1/models` on activation.
 - **Accurate Token Counting** using `js-tiktoken` (cl100k_base encoding).
 - **Persistent Connections** (HTTP Keep-Alive) for reduced latency.
@@ -83,7 +84,25 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
       "toolCalling": true,
       "reasoning": false
     }
-  }
+  },
+
+  // Additional OpenAI-compatible endpoints with unique model prefixes
+  "customLlmProvider.additionalEndpoints": [
+    {
+      "id": "ollama",
+      "url": "http://localhost:11434",
+      "apiKey": "",
+      "includeModels": ["llama3*", "qwen2.5-coder*"],
+      "excludeModels": [],
+      "additionalModels": ["deepseek-r1:7b"],
+      "modelOverrides": {
+        "qwen2.5-coder:latest": {
+          "maxInputTokens": 32000,
+          "toolCalling": true
+        }
+      }
+    }
+  ]
 }
 ```
 

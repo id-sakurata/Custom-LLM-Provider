@@ -50,7 +50,7 @@ class StatusBarManager {
         this.lastModelCount = 0;
         StatusBarManager.instance = this;
         this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-        this.statusBarItem.command = 'customLlmProvider.showStatus';
+        this.statusBarItem.command = 'customLlmProvider.refreshModels';
         this.update(ProviderStatus.Fetching);
         this.statusBarItem.show();
     }
