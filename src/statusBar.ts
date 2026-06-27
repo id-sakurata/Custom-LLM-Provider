@@ -3,7 +3,8 @@ import * as vscode from 'vscode';
 export enum ProviderStatus {
     Ready = 'ready',
     Error = 'error',
-    Fetching = 'fetching'
+    Fetching = 'fetching',
+    Disabled = 'disabled'
 }
 
 /**
@@ -45,6 +46,11 @@ export class StatusBarManager implements vscode.Disposable {
                 this.statusBarItem.text = `$(error) Custom LLM: Error`;
                 this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
                 this.statusBarItem.tooltip = 'Custom LLM Provider failed to fetch models. Click for details.';
+                break;
+            case ProviderStatus.Disabled:
+                this.statusBarItem.text = `$(circle-slash) Custom LLM: Disabled`;
+                this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+                this.statusBarItem.tooltip = 'Custom LLM Provider is disabled. Enable it in settings.';
                 break;
             case ProviderStatus.Fetching:
                 this.statusBarItem.text = `$(sync~spin) Custom LLM: Fetching...`;

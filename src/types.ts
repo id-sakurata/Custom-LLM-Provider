@@ -4,6 +4,8 @@ export interface ModelCapabilities {
   maxInputTokens: number;
   maxOutputTokens: number;
   requestDelay: number;
+  temperature: number;
+  topP: number;
   toolCalling: boolean;
   toolFlavor: ToolFlavor;
   vision: boolean;
@@ -44,6 +46,7 @@ export interface AdditionalEndpointConfig {
   id: string;
   url: string;
   apiKey?: string;
+  enabled?: boolean;
   includeModels?: string[];
   excludeModels?: string[];
   additionalModels?: string[];

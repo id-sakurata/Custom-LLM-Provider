@@ -1,5 +1,6 @@
 import * as https from 'https';
 import * as http from 'http';
+import * as net from 'net';
 import { URL } from 'url';
 import { FetchedModel, ModelsResponse, RetryConfig } from './types';
 
@@ -12,7 +13,8 @@ const httpsAgent = new https.Agent({ keepAlive: true });
  */
 function fetchModelsOnce(
   modelsUrl: string,
-  apiKey: string
+  apiKey: string,
+  proxyUrl?: string
 ): Promise<FetchedModel[]> {
   return new Promise((resolve, reject) => {
     const url = new URL(modelsUrl);
@@ -20,9 +22,6 @@ function fetchModelsOnce(
     const lib = isHttps ? https : http;
 
     const options: http.RequestOptions = {
-      hostname: url.hostname,
-      port: url.port || (isHttps ? 443 : 80),
-      path: url.pathname + url.search,
       method: 'GET',
       agent: isHttps ? httpsAgent : httpAgent,
       headers: {
@@ -31,6 +30,41 @@ function fetchModelsOnce(
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
     };
+
+    if (proxyUrl) {
+      const proxy = new URL(proxyUrl);
+      options.hostname = proxy.hostname;
+      options.port = proxy.port || '8080';
+      if (isHttps) {
+        options.agent = undefined;
+        options.createConnection = (_o, oncreate) => {
+          const proxyPort = String(options.port ?? '8080');
+          const proxyHost = String(options.hostname ?? 'localhost');
+          const proxySocket = net.connect(Number(proxyPort), proxyHost, () => {
+            proxySocket.write(
+              `CONNECT ${url.hostname}:${url.port || '443'} HTTP/1.1\r\n` +
+              `Host: ${url.hostname}:${url.port || '443'}\r\n\r\n`
+            );
+          });
+          proxySocket.once('data', (data) => {
+            if (data.toString().startsWith('HTTP/1.1 200')) {
+              oncreate(null, proxySocket);
+            } else {
+              oncreate(new Error(`Proxy CONNECT failed: ${data.toString().slice(0, 100)}`), null!);
+            }
+          });
+          proxySocket.on('error', (err) => oncreate(err, null!));
+          return proxySocket;
+        };
+        options.path = url.pathname + url.search;
+      } else {
+        options.path = modelsUrl;
+      }
+    } else {
+      options.hostname = url.hostname;
+      options.port = url.port || (isHttps ? 443 : 80);
+      options.path = url.pathname + url.search;
+    }
 
     const req = lib.request(options, (res) => {
       let data = '';
@@ -105,14 +139,15 @@ function isModelsFetchRetryable(err: Error, retryOnStatus: number[]): boolean {
 export async function fetchModelsFromEndpoint(
   modelsUrl: string,
   apiKey: string,
-  retryConfig?: RetryConfig
+  retryConfig?: RetryConfig,
+  proxyUrl?: string
 ): Promise<FetchedModel[]> {
   const config = retryConfig ?? { maxRetries: 0, retryDelay: 1000, retryBackoff: 'exponential', retryOnStatus: [429, 500, 502, 503, 504] };
   const maxRetries = config.maxRetries;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fetchModelsOnce(modelsUrl, apiKey);
+      return await fetchModelsOnce(modelsUrl, apiKey, proxyUrl);
     } catch (err) {
       if (attempt >= maxRetries || !(err instanceof Error) || !isModelsFetchRetryable(err, config.retryOnStatus)) {
         throw err;

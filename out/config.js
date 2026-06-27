@@ -46,6 +46,9 @@ class ConfigManager {
     /**
      * Base URL of the OpenAI-compatible API endpoint.
      */
+    static get enabled() {
+        return this.cfg().get('enabled', true);
+    }
     static get endpoint() {
         return this.cfg().get('endpoint', 'http://localhost:20128').replace(/\/$/, '');
     }
@@ -82,6 +85,8 @@ class ConfigManager {
             maxInputTokens: c.get('maxInputTokens', 160000),
             maxOutputTokens: c.get('maxOutputTokens', 32000),
             requestDelay: c.get('requestDelay', 1000),
+            temperature: c.get('defaultTemperature', 1.0),
+            topP: c.get('defaultTopP', 1.0),
             toolCalling: c.get('toolCalling', true),
             toolFlavor: c.get('toolFlavor', 'openai-tools'),
             vision: c.get('vision', false),
@@ -116,6 +121,15 @@ class ConfigManager {
     /**
      * Additional endpoints configured by the user.
      */
+    static get streamTimeout() {
+        return this.cfg().get('streamTimeout', 120000);
+    }
+    static get modelAliases() {
+        return this.cfg().get('modelAliases', {});
+    }
+    static get proxyUrl() {
+        return this.cfg().get('proxyUrl', '');
+    }
     static get additionalEndpoints() {
         return this.cfg().get('additionalEndpoints', []);
     }

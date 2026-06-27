@@ -163,6 +163,14 @@ export class ModelRegistry implements vscode.Disposable {
    * Refreshes the list of models from the remote endpoint and additional configuration.
    */
   async refreshModels(): Promise<void> {
+    if (!ConfigManager.enabled) {
+      this.registeredModels.clear();
+      this._onDidChange.fire();
+      this.statusBar.update(ProviderStatus.Disabled);
+      this.outputChannel.appendLine(`[${timestamp()}] Provider disabled — no models registered.`);
+      return;
+    }
+
     this.statusBar.update(ProviderStatus.Fetching);
     this.registeredModels.clear();
 
@@ -170,7 +178,7 @@ export class ModelRegistry implements vscode.Disposable {
     this.outputChannel.appendLine(`[${timestamp()}] Refreshing primary models from ${ConfigManager.modelsEndpoint}...`);
     let primaryFetched: FetchedModel[] = [];
     try {
-      primaryFetched = await fetchModelsFromEndpoint(ConfigManager.modelsEndpoint, ConfigManager.apiKey, ConfigManager.retryConfig);
+      primaryFetched = await fetchModelsFromEndpoint(ConfigManager.modelsEndpoint, ConfigManager.apiKey, ConfigManager.retryConfig, ConfigManager.proxyUrl);
       this.outputChannel.appendLine(
         `[${timestamp()}] Primary endpoint fetched ${primaryFetched.length} model(s): ${primaryFetched.map(m => m.id).join(', ')}`
       );
@@ -209,6 +217,10 @@ export class ModelRegistry implements vscode.Disposable {
       if (!endpoint.id || !endpoint.url) {
         continue;
       }
+      if (endpoint.enabled === false) {
+        this.outputChannel.appendLine(`[${timestamp()}] Skipping disabled endpoint '${endpoint.id}'`);
+        continue;
+      }
       const prefix = endpoint.id;
       const cleanUrl = endpoint.url.replace(/\/$/, '');
       const modelsUrl = `${cleanUrl}/v1/models`;
@@ -222,7 +234,7 @@ export class ModelRegistry implements vscode.Disposable {
       this.outputChannel.appendLine(`[${timestamp()}] Refreshing models from additional endpoint '${prefix}' (${modelsUrl})...`);
       let fetched: FetchedModel[] = [];
       try {
-        fetched = await fetchModelsFromEndpoint(modelsUrl, apiKey, ConfigManager.retryConfig);
+        fetched = await fetchModelsFromEndpoint(modelsUrl, apiKey, ConfigManager.retryConfig, ConfigManager.proxyUrl);
         this.outputChannel.appendLine(
           `[${timestamp()}] Endpoint '${prefix}' fetched ${fetched.length} model(s): ${fetched.map(m => m.id).join(', ')}`
         );
@@ -254,6 +266,41 @@ export class ModelRegistry implements vscode.Disposable {
           `[${timestamp()}]   + [${prefix}] ${registeredId} (${source}) ctx:${capabilities.maxInputTokens}/` +
           `${capabilities.maxOutputTokens} tools:${capabilities.toolCalling} vision:${capabilities.vision}`
         );
+      }
+    }
+
+    // 3. Register model aliases
+    const aliases = ConfigManager.modelAliases;
+    for (const [alias, targetId] of Object.entries(aliases)) {
+      const targetModel = this.registeredModels.get(targetId);
+      if (targetModel) {
+        if (!this.registeredModels.has(alias)) {
+          this.registeredModels.set(alias, {
+            id: alias,
+            originalId: targetModel.originalId,
+            capabilities: targetModel.capabilities,
+            source: targetModel.source,
+            chatEndpoint: targetModel.chatEndpoint,
+            apiKey: targetModel.apiKey
+          });
+          this.outputChannel.appendLine(`[${timestamp()}]   ~ alias '${alias}' -> '${targetId}'`);
+        }
+      } else {
+        // Try to find alias target as a prefixed model (e.g., "ollama:qwen2.5" if alias target is "qwen2.5")
+        for (const [registeredId, model] of this.registeredModels) {
+          if (model.originalId === targetId && !this.registeredModels.has(alias)) {
+            this.registeredModels.set(alias, {
+              id: alias,
+              originalId: model.originalId,
+              capabilities: model.capabilities,
+              source: model.source,
+              chatEndpoint: model.chatEndpoint,
+              apiKey: model.apiKey
+            });
+            this.outputChannel.appendLine(`[${timestamp()}]   ~ alias '${alias}' -> '${registeredId}' (originalId: ${targetId})`);
+            break;
+          }
+        }
       }
     }
 

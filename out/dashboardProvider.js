@@ -110,11 +110,15 @@ class DashboardProvider {
                     .cap-tag { font-size: 10px; border: 1px solid var(--vscode-textLink-foreground); padding: 1px 5px; border-radius: 3px; }
                     button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
                     button:hover { background: var(--vscode-button-hoverBackground); }
+                    .status-badge { font-size: 12px; padding: 4px 10px; border-radius: 10px; font-weight: bold; }
+                    .status-badge.enabled { background: var(--vscode-testing-iconPassed); color: white; }
+                    .status-badge.disabled { background: var(--vscode-statusBarItem-warningBackground); color: white; }
                 </style>
             </head>
             <body>
                 <div class="header">
                     <h1>Custom LLM Provider Dashboard</h1>
+                    <span class="status-badge ${config_1.ConfigManager.enabled ? 'enabled' : 'disabled'}">${config_1.ConfigManager.enabled ? 'Enabled' : 'Disabled'}</span>
                     <button onclick="refresh()">Refresh Models</button>
                 </div>
 

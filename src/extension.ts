@@ -101,6 +101,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(
       vscode.workspace.onDidChangeConfiguration(async (e) => {
         const affected = [
+          'customLlmProvider.enabled',
           'customLlmProvider.endpoint',
           'customLlmProvider.apiKey',
           'customLlmProvider.additionalModels',
@@ -116,6 +117,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           'customLlmProvider.reasoning',
           'customLlmProvider.reasoningEffort',
           'customLlmProvider.modelOverrides',
+          'customLlmProvider.defaultTemperature',
+          'customLlmProvider.defaultTopP',
+          'customLlmProvider.streamTimeout',
+          'customLlmProvider.modelAliases',
+          'customLlmProvider.proxyUrl',
           'customLlmProvider.autoRefreshInterval',
           'customLlmProvider.maxRetries',
           'customLlmProvider.retryDelay',

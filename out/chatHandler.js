@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatHandler = void 0;
 const https = __importStar(require("https"));
 const http = __importStar(require("http"));
+const net = __importStar(require("net"));
 const url_1 = require("url");
 const vscode = __importStar(require("vscode"));
 const toolAdapter_1 = require("./toolAdapter");
@@ -76,6 +77,12 @@ class ChatHandler {
                 stream: true,
                 max_tokens: this.capabilities.maxOutputTokens,
             };
+            if (this.capabilities.temperature > 0) {
+                body.temperature = this.capabilities.temperature;
+            }
+            if (this.capabilities.topP < 1.0) {
+                body.top_p = this.capabilities.topP;
+            }
             if (this.capabilities.toolCalling) {
                 if (translated.tools) {
                     body.tools = translated.tools;
@@ -246,13 +253,11 @@ class ChatHandler {
         const url = new url_1.URL(this.chatEndpoint);
         const isHttps = url.protocol === 'https:';
         const lib = isHttps ? https : http;
-        const agent = isHttps ? ChatHandler.httpsAgent : ChatHandler.httpAgent;
+        const proxyUrl = config_1.ConfigManager.proxyUrl;
+        let agent = isHttps ? ChatHandler.httpsAgent : ChatHandler.httpAgent;
         const options = {
-            hostname: url.hostname,
-            port: url.port || (isHttps ? '443' : '80'),
-            path: url.pathname + url.search,
             method: 'POST',
-            agent, // Use keep-alive agent
+            agent,
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'text/event-stream',
@@ -260,6 +265,44 @@ class ChatHandler {
                 ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
             },
         };
+        if (proxyUrl) {
+            const proxy = new url_1.URL(proxyUrl);
+            options.hostname = proxy.hostname;
+            options.port = proxy.port || '8080';
+            if (isHttps) {
+                // HTTPS target through HTTP proxy — use CONNECT tunneling
+                agent = undefined;
+                options.agent = undefined;
+                options.createConnection = (_options, oncreate) => {
+                    const proxyPort = String(options.port ?? '8080');
+                    const proxyHost = String(options.hostname ?? 'localhost');
+                    const proxySocket = net.connect(Number(proxyPort), proxyHost, () => {
+                        proxySocket.write(`CONNECT ${url.hostname}:${url.port || '443'} HTTP/1.1\r\n` +
+                            `Host: ${url.hostname}:${url.port || '443'}\r\n` +
+                            `\r\n`);
+                    });
+                    proxySocket.once('data', (data) => {
+                        if (data.toString().startsWith('HTTP/1.1 200')) {
+                            oncreate(null, proxySocket);
+                        }
+                        else {
+                            oncreate(new Error(`Proxy CONNECT failed: ${data.toString().slice(0, 100)}`), null);
+                        }
+                    });
+                    proxySocket.on('error', (err) => oncreate(err, null));
+                    return proxySocket;
+                };
+                options.path = url.pathname + url.search;
+            }
+            else {
+                options.path = this.chatEndpoint;
+            }
+        }
+        else {
+            options.hostname = url.hostname;
+            options.port = url.port || (isHttps ? '443' : '80');
+            options.path = url.pathname + url.search;
+        }
         const chunks = [];
         let done = false;
         let notify = null;
@@ -336,8 +379,10 @@ class ChatHandler {
         });
         req.write(bodyStr);
         req.end();
-        req.setTimeout(120000, () => {
-            error = new Error('Request timed out after 120 seconds');
+        const timeout = config_1.ConfigManager.streamTimeout;
+        const reqTimeout = timeout > 0 ? timeout : undefined;
+        req.setTimeout(reqTimeout ?? 120000, () => {
+            error = new Error(`Request timed out after ${(reqTimeout ?? 120000) / 1000} seconds`);
             req.destroy();
             done = true;
             notify?.();

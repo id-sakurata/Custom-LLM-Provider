@@ -40,6 +40,7 @@ var ProviderStatus;
     ProviderStatus["Ready"] = "ready";
     ProviderStatus["Error"] = "error";
     ProviderStatus["Fetching"] = "fetching";
+    ProviderStatus["Disabled"] = "disabled";
 })(ProviderStatus || (exports.ProviderStatus = ProviderStatus = {}));
 /**
  * Manages the VS Code Status Bar item for the Custom LLM Provider.
@@ -72,6 +73,11 @@ class StatusBarManager {
                 this.statusBarItem.text = `$(error) Custom LLM: Error`;
                 this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
                 this.statusBarItem.tooltip = 'Custom LLM Provider failed to fetch models. Click for details.';
+                break;
+            case ProviderStatus.Disabled:
+                this.statusBarItem.text = `$(circle-slash) Custom LLM: Disabled`;
+                this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+                this.statusBarItem.tooltip = 'Custom LLM Provider is disabled. Enable it in settings.';
                 break;
             case ProviderStatus.Fetching:
                 this.statusBarItem.text = `$(sync~spin) Custom LLM: Fetching...`;

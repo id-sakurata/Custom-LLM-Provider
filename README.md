@@ -5,6 +5,10 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
 ## Features
 
 - **Multi-Endpoint/Multi-Provider Support**: Configure multiple LLM providers (e.g., local Ollama and cloud-based DeepSeek) simultaneously with custom prefixes to avoid model name collisions.
+- **Model Aliases**: Create short memorable names for any model.
+- **Proxy Support**: Route all API requests through an HTTP/HTTPS proxy.
+- **Sampling Parameters**: Configure temperature and top-p globally or per-model.
+- **Configurable Stream Timeout**: Set a custom timeout for streaming responses.
 - **Auto-fetches models** from `GET /v1/models` on activation.
 - **Accurate Token Counting** using `js-tiktoken` (cl100k_base encoding).
 - **Persistent Connections** (HTTP Keep-Alive) for reduced latency.
@@ -16,7 +20,7 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
 - **Request Delay Indicator**: Displays a real-time countdown on the status bar (e.g., `Delay 2.5s`) during active request cooldowns if the configured request delay is greater than 1 second.
 - **Auto-refresh** on a configurable interval.
 - **Re-registers on config change** — no restart needed.
-- **Configurable Auto-Retry**: Retry failed requests with configurable count, delay, and backoff strategy (fixed/linear/exponential).
+- **Configurable Auto-Retry**: Retry failed requests with configurable count, delay, and backoff strategy (fixed/linear/exponential). Automatically retries on empty responses to prevent "Sorry, no response was returned."
 
 ## Requirements
 
@@ -36,6 +40,9 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
 
 ```jsonc
 {
+  // Enable or disable the entire provider
+  "customLlmProvider.enabled": true,
+
   // Base URL of your API (no trailing slash, no /v1)
   "customLlmProvider.endpoint": "http://localhost:20128",
 
@@ -49,6 +56,22 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
   "customLlmProvider.additionalModels": [
     "my-local-model"
   ],
+
+  // Proxy URL (empty = direct connection)
+  "customLlmProvider.proxyUrl": "",
+
+  // Sampling defaults
+  "customLlmProvider.defaultTemperature": 1.0,
+  "customLlmProvider.defaultTopP": 1.0,
+
+  // Stream timeout in ms (0 = no timeout)
+  "customLlmProvider.streamTimeout": 120000,
+
+  // Model aliases: alias -> target model ID
+  "customLlmProvider.modelAliases": {
+    "fast": "qwen2.5-coder:latest",
+    "big": "deepseek-r1:7b"
+  },
 
   // Default capabilities applied to all models (fallback)
   "customLlmProvider.maxInputTokens": 160000,
@@ -92,6 +115,7 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
       "id": "ollama",
       "url": "http://localhost:11434",
       "apiKey": "",
+      "enabled": true,
       "includeModels": ["llama3*", "qwen2.5-coder*"],
       "excludeModels": [],
       "additionalModels": ["deepseek-r1:7b"],
@@ -114,6 +138,7 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
 | `Custom LLM: Show Provider Status` | Show status of registered models in a Quick Pick and print log to Output panel |
 | `Custom LLM: Setup Wizard` | Interactive setup wizard to configure endpoint and API Key |
 | `Custom LLM: Open Dashboard` | Open the Webview dashboard showing stats and registered models |
+| *Status bar click* | Click the status bar to instantly refresh models |
 
 ## How It Works
 

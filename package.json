@@ -2,7 +2,7 @@
   "name": "custom-llm-provider",
   "displayName": "Custom LLM Provider for Copilot Chat",
   "description": "Custom LLM provider that auto-fetches models from OpenAI-compatible endpoints",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "publisher": "custom",
   "repository": {
     "type": "git",
@@ -62,6 +62,11 @@
     "configuration": {
       "title": "Custom LLM Provider",
       "properties": {
+        "customLlmProvider.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable the entire Custom LLM Provider. When disabled, no models are registered."
+        },
         "customLlmProvider.endpoint": {
           "type": "string",
           "default": "http://localhost:20128",
@@ -110,6 +115,41 @@
           "type": "number",
           "default": 32000,
           "description": "Default maximum output tokens per response for all models."
+        },
+        "customLlmProvider.defaultTemperature": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Default temperature for sampling (0-2). Applied to all models unless overridden."
+        },
+        "customLlmProvider.defaultTopP": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Default top-p for nucleus sampling (0-1). Applied to all models unless overridden."
+        },
+        "customLlmProvider.streamTimeout": {
+          "type": "number",
+          "default": 120000,
+          "description": "Timeout in milliseconds for each streaming request (0 = no timeout)."
+        },
+        "customLlmProvider.modelAliases": {
+          "type": "object",
+          "default": {},
+          "description": "Model aliases: key = alias name, value = target model ID. Aliases appear alongside real models.",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "patternProperties": {
+            ".*": { "type": "string" }
+          }
+        },
+        "customLlmProvider.proxyUrl": {
+          "type": "string",
+          "default": "",
+          "description": "HTTP/HTTPS proxy URL (e.g. http://127.0.0.1:8080). Leave empty for direct connection."
         },
         "customLlmProvider.requestDelay": {
           "type": "number",
@@ -167,6 +207,16 @@
               },
               "requestDelay": {
                 "type": "number"
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "topP": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
               },
               "toolCalling": {
                 "type": "boolean"
@@ -229,6 +279,11 @@
                 "type": "string",
                 "description": "Unique identifier for this endpoint, used as prefix for its models (e.g. 'ollama')"
               },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Enable or disable this specific endpoint."
+              },
               "url": {
                 "type": "string",
                 "description": "Base URL of the OpenAI-compatible API (without /v1, e.g. http://localhost:11434)"
@@ -262,6 +317,8 @@
                     "maxInputTokens": { "type": "number" },
                     "maxOutputTokens": { "type": "number" },
                     "requestDelay": { "type": "number" },
+                    "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+                    "topP": { "type": "number", "minimum": 0, "maximum": 1 },
                     "toolCalling": { "type": "boolean" },
                     "toolFlavor": {
                       "type": "string",

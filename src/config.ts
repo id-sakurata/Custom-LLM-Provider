@@ -15,6 +15,10 @@ export class ConfigManager {
   /**
    * Base URL of the OpenAI-compatible API endpoint.
    */
+  static get enabled(): boolean {
+    return this.cfg().get<boolean>('enabled', true);
+  }
+
   static get endpoint(): string {
     return this.cfg().get<string>('endpoint', 'http://localhost:20128').replace(/\/$/, '');
   }
@@ -56,7 +60,9 @@ export class ConfigManager {
     return {
       maxInputTokens:  c.get<number>('maxInputTokens',  160000),
       maxOutputTokens: c.get<number>('maxOutputTokens', 32000),
-      requestDelay:    c.get<number>('requestDelay',    1000),
+      requestDelay:    c.get<number>('requestDelay',       1000),
+      temperature:     c.get<number>('defaultTemperature', 1.0),
+      topP:            c.get<number>('defaultTopP',        1.0),
       toolCalling:     c.get<boolean>('toolCalling',    true),
       toolFlavor:      c.get<ToolFlavor>('toolFlavor',  'openai-tools'),
       vision:          c.get<boolean>('vision',         false),
@@ -96,6 +102,18 @@ export class ConfigManager {
   /**
    * Additional endpoints configured by the user.
    */
+  static get streamTimeout(): number {
+    return this.cfg().get<number>('streamTimeout', 120000);
+  }
+
+  static get modelAliases(): Record<string, string> {
+    return this.cfg().get<Record<string, string>>('modelAliases', {});
+  }
+
+  static get proxyUrl(): string {
+    return this.cfg().get<string>('proxyUrl', '');
+  }
+
   static get additionalEndpoints(): AdditionalEndpointConfig[] {
     return this.cfg().get<AdditionalEndpointConfig[]>('additionalEndpoints', []);
   }

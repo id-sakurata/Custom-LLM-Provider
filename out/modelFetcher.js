@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchModelsFromEndpoint = fetchModelsFromEndpoint;
 const https = __importStar(require("https"));
 const http = __importStar(require("http"));
+const net = __importStar(require("net"));
 const url_1 = require("url");
 // Shared agents for persistent connections (Keep-Alive)
 const httpAgent = new http.Agent({ keepAlive: true });
@@ -43,15 +44,12 @@ const httpsAgent = new https.Agent({ keepAlive: true });
 /**
  * Makes a single HTTP request to fetch models.
  */
-function fetchModelsOnce(modelsUrl, apiKey) {
+function fetchModelsOnce(modelsUrl, apiKey, proxyUrl) {
     return new Promise((resolve, reject) => {
         const url = new url_1.URL(modelsUrl);
         const isHttps = url.protocol === 'https:';
         const lib = isHttps ? https : http;
         const options = {
-            hostname: url.hostname,
-            port: url.port || (isHttps ? 443 : 80),
-            path: url.pathname + url.search,
             method: 'GET',
             agent: isHttps ? httpsAgent : httpAgent,
             headers: {
@@ -60,6 +58,41 @@ function fetchModelsOnce(modelsUrl, apiKey) {
                 ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
             },
         };
+        if (proxyUrl) {
+            const proxy = new url_1.URL(proxyUrl);
+            options.hostname = proxy.hostname;
+            options.port = proxy.port || '8080';
+            if (isHttps) {
+                options.agent = undefined;
+                options.createConnection = (_o, oncreate) => {
+                    const proxyPort = String(options.port ?? '8080');
+                    const proxyHost = String(options.hostname ?? 'localhost');
+                    const proxySocket = net.connect(Number(proxyPort), proxyHost, () => {
+                        proxySocket.write(`CONNECT ${url.hostname}:${url.port || '443'} HTTP/1.1\r\n` +
+                            `Host: ${url.hostname}:${url.port || '443'}\r\n\r\n`);
+                    });
+                    proxySocket.once('data', (data) => {
+                        if (data.toString().startsWith('HTTP/1.1 200')) {
+                            oncreate(null, proxySocket);
+                        }
+                        else {
+                            oncreate(new Error(`Proxy CONNECT failed: ${data.toString().slice(0, 100)}`), null);
+                        }
+                    });
+                    proxySocket.on('error', (err) => oncreate(err, null));
+                    return proxySocket;
+                };
+                options.path = url.pathname + url.search;
+            }
+            else {
+                options.path = modelsUrl;
+            }
+        }
+        else {
+            options.hostname = url.hostname;
+            options.port = url.port || (isHttps ? 443 : 80);
+            options.path = url.pathname + url.search;
+        }
         const req = lib.request(options, (res) => {
             let data = '';
             res.on('data', (chunk) => {
@@ -122,12 +155,12 @@ function isModelsFetchRetryable(err, retryOnStatus) {
  * @param retryConfig Optional retry configuration (uses defaults if omitted).
  * @returns A promise that resolves to an array of fetched models.
  */
-async function fetchModelsFromEndpoint(modelsUrl, apiKey, retryConfig) {
+async function fetchModelsFromEndpoint(modelsUrl, apiKey, retryConfig, proxyUrl) {
     const config = retryConfig ?? { maxRetries: 0, retryDelay: 1000, retryBackoff: 'exponential', retryOnStatus: [429, 500, 502, 503, 504] };
     const maxRetries = config.maxRetries;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            return await fetchModelsOnce(modelsUrl, apiKey);
+            return await fetchModelsOnce(modelsUrl, apiKey, proxyUrl);
         }
         catch (err) {
             if (attempt >= maxRetries || !(err instanceof Error) || !isModelsFetchRetryable(err, config.retryOnStatus)) {

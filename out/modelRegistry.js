@@ -152,13 +152,20 @@ class ModelRegistry {
      * Refreshes the list of models from the remote endpoint and additional configuration.
      */
     async refreshModels() {
+        if (!config_1.ConfigManager.enabled) {
+            this.registeredModels.clear();
+            this._onDidChange.fire();
+            this.statusBar.update(statusBar_1.ProviderStatus.Disabled);
+            this.outputChannel.appendLine(`[${timestamp()}] Provider disabled — no models registered.`);
+            return;
+        }
         this.statusBar.update(statusBar_1.ProviderStatus.Fetching);
         this.registeredModels.clear();
         // 1. Fetch from primary endpoint
         this.outputChannel.appendLine(`[${timestamp()}] Refreshing primary models from ${config_1.ConfigManager.modelsEndpoint}...`);
         let primaryFetched = [];
         try {
-            primaryFetched = await (0, modelFetcher_1.fetchModelsFromEndpoint)(config_1.ConfigManager.modelsEndpoint, config_1.ConfigManager.apiKey, config_1.ConfigManager.retryConfig);
+            primaryFetched = await (0, modelFetcher_1.fetchModelsFromEndpoint)(config_1.ConfigManager.modelsEndpoint, config_1.ConfigManager.apiKey, config_1.ConfigManager.retryConfig, config_1.ConfigManager.proxyUrl);
             this.outputChannel.appendLine(`[${timestamp()}] Primary endpoint fetched ${primaryFetched.length} model(s): ${primaryFetched.map(m => m.id).join(', ')}`);
         }
         catch (err) {
@@ -189,6 +196,10 @@ class ModelRegistry {
             if (!endpoint.id || !endpoint.url) {
                 continue;
             }
+            if (endpoint.enabled === false) {
+                this.outputChannel.appendLine(`[${timestamp()}] Skipping disabled endpoint '${endpoint.id}'`);
+                continue;
+            }
             const prefix = endpoint.id;
             const cleanUrl = endpoint.url.replace(/\/$/, '');
             const modelsUrl = `${cleanUrl}/v1/models`;
@@ -201,7 +212,7 @@ class ModelRegistry {
             this.outputChannel.appendLine(`[${timestamp()}] Refreshing models from additional endpoint '${prefix}' (${modelsUrl})...`);
             let fetched = [];
             try {
-                fetched = await (0, modelFetcher_1.fetchModelsFromEndpoint)(modelsUrl, apiKey, config_1.ConfigManager.retryConfig);
+                fetched = await (0, modelFetcher_1.fetchModelsFromEndpoint)(modelsUrl, apiKey, config_1.ConfigManager.retryConfig, config_1.ConfigManager.proxyUrl);
                 this.outputChannel.appendLine(`[${timestamp()}] Endpoint '${prefix}' fetched ${fetched.length} model(s): ${fetched.map(m => m.id).join(', ')}`);
             }
             catch (err) {
@@ -226,6 +237,41 @@ class ModelRegistry {
                 });
                 this.outputChannel.appendLine(`[${timestamp()}]   + [${prefix}] ${registeredId} (${source}) ctx:${capabilities.maxInputTokens}/` +
                     `${capabilities.maxOutputTokens} tools:${capabilities.toolCalling} vision:${capabilities.vision}`);
+            }
+        }
+        // 3. Register model aliases
+        const aliases = config_1.ConfigManager.modelAliases;
+        for (const [alias, targetId] of Object.entries(aliases)) {
+            const targetModel = this.registeredModels.get(targetId);
+            if (targetModel) {
+                if (!this.registeredModels.has(alias)) {
+                    this.registeredModels.set(alias, {
+                        id: alias,
+                        originalId: targetModel.originalId,
+                        capabilities: targetModel.capabilities,
+                        source: targetModel.source,
+                        chatEndpoint: targetModel.chatEndpoint,
+                        apiKey: targetModel.apiKey
+                    });
+                    this.outputChannel.appendLine(`[${timestamp()}]   ~ alias '${alias}' -> '${targetId}'`);
+                }
+            }
+            else {
+                // Try to find alias target as a prefixed model (e.g., "ollama:qwen2.5" if alias target is "qwen2.5")
+                for (const [registeredId, model] of this.registeredModels) {
+                    if (model.originalId === targetId && !this.registeredModels.has(alias)) {
+                        this.registeredModels.set(alias, {
+                            id: alias,
+                            originalId: model.originalId,
+                            capabilities: model.capabilities,
+                            source: model.source,
+                            chatEndpoint: model.chatEndpoint,
+                            apiKey: model.apiKey
+                        });
+                        this.outputChannel.appendLine(`[${timestamp()}]   ~ alias '${alias}' -> '${registeredId}' (originalId: ${targetId})`);
+                        break;
+                    }
+                }
             }
         }
         if (this.registeredModels.size === 0) {
