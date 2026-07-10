@@ -117,4 +117,32 @@ export class ConfigManager {
   static get additionalEndpoints(): AdditionalEndpointConfig[] {
     return this.cfg().get<AdditionalEndpointConfig[]>('additionalEndpoints', []);
   }
+
+  static get inlineCompletionEnabled(): boolean {
+    return this.cfg().get<boolean>('inlineCompletion.enabled', false);
+  }
+
+  static get inlineCompletionEndpoint(): string {
+    return this.cfg().get<string>('inlineCompletion.endpoint', '').replace(/\/$/, '');
+  }
+
+  static get inlineCompletionApiKey(): string {
+    return this.cfg().get<string>('inlineCompletion.apiKey', '');
+  }
+
+  static get inlineCompletionModel(): string {
+    return this.cfg().get<string>('inlineCompletion.model', '');
+  }
+
+  static get inlineCompletionMode(): 'chat-fim' | 'completions-fim' | 'forward-only' {
+    return this.cfg().get<'chat-fim' | 'completions-fim' | 'forward-only'>('inlineCompletion.mode', 'chat-fim');
+  }
+
+  static get inlineCompletionDebounceDelay(): number {
+    return this.cfg().get<number>('inlineCompletion.debounceDelay', 400);
+  }
+
+  static get inlineCompletionMaxContextLines(): number {
+    return this.cfg().get<number>('inlineCompletion.maxContextLines', 100);
+  }
 }

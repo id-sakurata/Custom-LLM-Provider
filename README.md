@@ -126,7 +126,29 @@ A VSCode extension that registers custom LLM models from any OpenAI-compatible A
         }
       }
     }
-  ]
+  ],
+
+  // --- Inline Completion (Auto-Complete) Configuration ---
+  // Enable inline code completion (auto-complete) using custom LLM provider
+  "customLlmProvider.inlineCompletion.enabled": false,
+
+  // Base URL of the OpenAI-compatible API for completions (falls back to primary endpoint if empty)
+  "customLlmProvider.inlineCompletion.endpoint": "",
+
+  // API Key for authorization (falls back to primary apiKey if empty)
+  "customLlmProvider.inlineCompletion.apiKey": "",
+
+  // Model ID to use for inline completion (e.g. "qwen2.5-coder:1.5b")
+  "customLlmProvider.inlineCompletion.model": "qwen2.5-coder:1.5b",
+
+  // Completion mode: "chat-fim" (Instruct FIM), "completions-fim" (Raw FIM), "forward-only" (Chat continuation)
+  "customLlmProvider.inlineCompletion.mode": "chat-fim",
+
+  // Delay (ms) to wait before triggering API requests after user stops typing
+  "customLlmProvider.inlineCompletion.debounceDelay": 400,
+
+  // Maximum number of lines around the cursor (before/after) to send as context
+  "customLlmProvider.inlineCompletion.maxContextLines": 100
 }
 ```
 

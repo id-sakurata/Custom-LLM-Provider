@@ -2,7 +2,7 @@
   "name": "custom-llm-provider",
   "displayName": "Custom LLM Provider for Copilot Chat",
   "description": "Custom LLM provider that auto-fetches models from OpenAI-compatible endpoints",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "publisher": "custom",
   "repository": {
     "type": "git",
@@ -336,6 +336,42 @@
               }
             }
           }
+        },
+        "customLlmProvider.inlineCompletion.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable inline code completion (auto-complete) using custom LLM provider."
+        },
+        "customLlmProvider.inlineCompletion.endpoint": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL of the OpenAI-compatible API for inline completion (falls back to primary endpoint if empty)."
+        },
+        "customLlmProvider.inlineCompletion.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for inline completion (falls back to primary apiKey if empty)."
+        },
+        "customLlmProvider.inlineCompletion.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID to use for inline completion (e.g., 'meta-llama/llama-3-8b-instruct' on OpenRouter, or 'qwen2.5-coder' on Ollama). Required."
+        },
+        "customLlmProvider.inlineCompletion.mode": {
+          "type": "string",
+          "enum": ["chat-fim", "completions-fim", "forward-only"],
+          "default": "chat-fim",
+          "description": "Completion mode: 'chat-fim' (Instruct-based Fill-in-the-Middle), 'completions-fim' (raw /v1/completions FIM), or 'forward-only' (chat continuation)."
+        },
+        "customLlmProvider.inlineCompletion.debounceDelay": {
+          "type": "number",
+          "default": 400,
+          "description": "Delay in milliseconds to wait before triggering API requests after user stops typing."
+        },
+        "customLlmProvider.inlineCompletion.maxContextLines": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of lines around the cursor (before and after) to send as context."
         }
       }
     }

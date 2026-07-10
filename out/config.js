@@ -133,6 +133,27 @@ class ConfigManager {
     static get additionalEndpoints() {
         return this.cfg().get('additionalEndpoints', []);
     }
+    static get inlineCompletionEnabled() {
+        return this.cfg().get('inlineCompletion.enabled', false);
+    }
+    static get inlineCompletionEndpoint() {
+        return this.cfg().get('inlineCompletion.endpoint', '').replace(/\/$/, '');
+    }
+    static get inlineCompletionApiKey() {
+        return this.cfg().get('inlineCompletion.apiKey', '');
+    }
+    static get inlineCompletionModel() {
+        return this.cfg().get('inlineCompletion.model', '');
+    }
+    static get inlineCompletionMode() {
+        return this.cfg().get('inlineCompletion.mode', 'chat-fim');
+    }
+    static get inlineCompletionDebounceDelay() {
+        return this.cfg().get('inlineCompletion.debounceDelay', 400);
+    }
+    static get inlineCompletionMaxContextLines() {
+        return this.cfg().get('inlineCompletion.maxContextLines', 100);
+    }
 }
 exports.ConfigManager = ConfigManager;
 ConfigManager.S = 'customLlmProvider';

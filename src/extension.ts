@@ -3,6 +3,7 @@ import { ModelRegistry } from './modelRegistry';
 import { StatusBarManager } from './statusBar';
 import { showSetupWizard } from './setupWizard';
 import { DashboardProvider } from './dashboardProvider';
+import { CustomInlineCompletionProvider } from './inlineCompletionProvider';
 
 /**
  * Global reference to the model registry, output channel, and status bar.
@@ -138,6 +139,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           }
         }
       })
+    );
+
+    // 5.5 Register Inline Completion Provider
+    const inlineCompletionProvider = new CustomInlineCompletionProvider(outputChannel);
+    context.subscriptions.push(
+      vscode.languages.registerInlineCompletionItemProvider(
+        [
+          { scheme: 'file', pattern: '**' },
+          { scheme: 'untitled', pattern: '**' }
+        ],
+        inlineCompletionProvider
+      )
     );
 
     // 6. Initialize Registry (fetch models)
