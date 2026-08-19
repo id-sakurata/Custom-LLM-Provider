@@ -79,14 +79,33 @@ export class ConfigManager {
     return this.cfg().get<Record<string, Partial<ModelCapabilities>>>('modelOverrides', {});
   }
 
+  private static resolveUrl(baseUrl: string, defaultPath: string): string {
+    const cleanBase = baseUrl.replace(/\/+$/, '');
+    const cleanPath = defaultPath.startsWith('/') ? defaultPath : `/${defaultPath}`;
+
+    if (cleanBase.toLowerCase().endsWith('/v1') && cleanPath.toLowerCase().startsWith('/v1/')) {
+      return `${cleanBase}${cleanPath.substring(3)}`;
+    }
+    if (cleanBase.toLowerCase().includes('/v1') && cleanPath.toLowerCase().startsWith('/v1/')) {
+      return `${cleanBase}${cleanPath.substring(3)}`;
+    }
+    return `${cleanBase}${cleanPath}`;
+  }
+
   /**
    * Full URL for fetching the list of models.
    */
-  static get modelsEndpoint(): string { return `${this.endpoint}/v1/models`; }
+  static get modelsEndpoint(): string {
+    return this.resolveUrl(this.endpoint, '/v1/models');
+  }
   
   /**
    * Full URL for chat completions.
    */
+  static get chatEndpoint(): string {
+    return this.resolveUrl(this.endpoint, '/v1/chat/completions');
+  }
+
   static get retryConfig(): RetryConfig {
     const c = this.cfg();
     return {
@@ -96,8 +115,6 @@ export class ConfigManager {
       retryOnStatus: c.get<number[]>('retryOnStatus', [429, 500, 502, 503, 504]),
     };
   }
-
-  static get chatEndpoint(): string   { return `${this.endpoint}/v1/chat/completions`; }
 
   /**
    * Additional endpoints configured by the user.
@@ -144,5 +161,9 @@ export class ConfigManager {
 
   static get inlineCompletionMaxContextLines(): number {
     return this.cfg().get<number>('inlineCompletion.maxContextLines', 100);
+  }
+
+  static get inlineCompletionUseStreaming(): boolean {
+    return this.cfg().get<boolean>('inlineCompletion.useStreaming', true);
   }
 }

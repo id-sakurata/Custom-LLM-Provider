@@ -1,181 +1,215 @@
-# Custom LLM Provider for GitHub Copilot Chat
+# Custom LLM Provider for GitHub Copilot Chat & VS Code
 
-A VSCode extension that registers custom LLM models from any OpenAI-compatible API endpoint directly into GitHub Copilot Chat.
+A powerful VS Code extension that registers custom LLM models from any OpenAI-compatible API endpoint directly into **GitHub Copilot Chat** and provides **Intelligence-Powered Ghost Text Inline Completion (Auto-Complete)**.
 
-## Features
+---
 
-- **Multi-Endpoint/Multi-Provider Support**: Configure multiple LLM providers (e.g., local Ollama and cloud-based DeepSeek) simultaneously with custom prefixes to avoid model name collisions.
-- **Model Aliases**: Create short memorable names for any model.
-- **Proxy Support**: Route all API requests through an HTTP/HTTPS proxy.
-- **Sampling Parameters**: Configure temperature and top-p globally or per-model.
-- **Configurable Stream Timeout**: Set a custom timeout for streaming responses.
-- **Auto-fetches models** from `GET /v1/models` on activation.
-- **Accurate Token Counting** using `js-tiktoken` (cl100k_base encoding).
-- **Persistent Connections** (HTTP Keep-Alive) for reduced latency.
-- **Granular Error Handling**: Specific VS Code error types for 401/403 (Auth), 429 (Rate Limit), and 5xx (Server) errors.
-- **Image/Vision Support**: Full support for `vscode.LanguageModelImagePart` (auto-conversion to Base64).
-- **Anti-Race Condition**: Strict sequential request queue for models with cooldowns.
-- **Tool/Function Calling**: Native support for VS Code Chat tools.
-- **Reasoning/Thinking**: Supports reasoning tokens and thinking budgets, rendered inside clean Markdown blockquotes.
-- **Request Delay Indicator**: Displays a real-time countdown on the status bar (e.g., `Delay 2.5s`) during active request cooldowns if the configured request delay is greater than 1 second.
-- **Auto-refresh** on a configurable interval.
-- **Re-registers on config change** — no restart needed.
-- **Configurable Auto-Retry**: Retry failed requests with configurable count, delay, and backoff strategy (fixed/linear/exponential). Automatically retries on empty responses to prevent "Sorry, no response was returned."
+## 🌟 Key Features
 
-## Requirements
+### 💬 Chat Provider (`vscode.lm` Copilot Chat)
+- **Multi-Endpoint & Multi-Provider Support**: Connect multiple OpenAI-compatible servers simultaneously (e.g., local Ollama, LM Studio, vLLM, OpenRouter, DeepSeek, Groq) with custom model prefixes.
+- **Model Aliases**: Assign short, memorable names for complex model IDs.
+- **Vision / Image Input**: Full support for `vscode.LanguageModelImagePart` (automatic Base64 image conversion).
+- **Tool / Function Calling**: Native integration with VS Code Chat tools (`openai-tools`, `openai-functions`, or `text-based`).
+- **Reasoning / Thinking Tokens**: Renders thinking process from models like DeepSeek-R1, OpenAI o1, or Anthropic inside clean Markdown blockquotes.
+- **Auto-Retry Logic**: Automatic backoff retries (fixed/linear/exponential) for HTTP 429/5xx errors or network drops.
+- **Accurate Token Counting**: High-precision token estimation using `js-tiktoken` (`cl100k_base`).
 
-- VSCode >= 1.90
-- GitHub Copilot Chat extension installed and signed in
-- An OpenAI-compatible server (e.g., LM Studio, Ollama OpenAI mode, vLLM, llama.cpp)
+### ⚡ Intelligence-Powered Inline Completion (Ghost Text Auto-Complete)
+- **Ultra-Fast Local Caching (Phase 1A)**: Instant (< 1ms) ghost text reuse when typing characters that match previous suggestions without calling the API.
+- **Dynamic Scope Tuning (Phase 1B)**: Automatically restricts to **Single-Line** (`stop: ['\n']`) when editing mid-line, or **Multi-Line / Full Block** when typing on a new line.
+- **Suffix Overlap Deduplication (Phase 1C)**: Cleans up duplicate closing brackets `);`, `}`, `]` that already exist to the right of the cursor.
+- **Neighboring Open Tabs Context (Phase 2)**: Reads relevant code snippets from other open editor tabs using **Jaccard Similarity** token matching.
+- **AST Go-To-Definition Context Resolver (Phase 3)**: Uses VS Code language providers (`vscode.executeDefinitionProvider`) to include `interface`, `type`, `class`, or `function` definitions referenced around the cursor.
+- **Configurable Streaming Mode (`useStreaming`)**: Low latency Server-Sent Events (SSE) streaming with **Time-To-First-Token (TTFT)** tracking and early newline aborts. Toggleable for non-streaming endpoints.
+- **Flexible Endpoint Resolution**: Smart URL builder that prevents duplicate `/v1/v1` paths and supports custom API routes.
 
-## Quick Start
+### 🎛️ UI & Diagnostics
+- **Interactive Setup Wizard**: Guided step-by-step setup for endpoints and API keys.
+- **Webview Dashboard**: Visual dashboard displaying registered models, capabilities, and system status.
+- **Real-Time Status Bar**: Displays active model count, request cooldown countdowns, and click-to-refresh.
+- **Detailed Output Channel**: Verbose debugging logs in `Custom LLM Provider` output window.
 
-1. Install the extension
-2. Open Settings → search `customLlmProvider`
-3. Set your **endpoint** (default: `http://localhost:20128`)
-4. The extension will auto-fetch and register all models on startup
-5. Open Copilot Chat → click the model picker → your models appear under `custom-llm`
+---
 
-## Configuration
+## 🚀 Quick Start
+
+1. Install the extension in VS Code.
+2. Ensure **VS Code Inline Suggestion** is enabled in your settings:
+   ```json
+   "editor.inlineSuggest.enabled": true
+   ```
+3. Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and run **`Custom LLM: Setup Wizard`**.
+4. Enter your base URL (e.g., `http://localhost:11434` for Ollama or `http://localhost:1234` for LM Studio).
+5. Open **Copilot Chat** → click the model picker dropdown → your models will appear under `custom-llm`.
+6. Enable **Inline Completion** in settings to get AI-powered ghost text code completions as you type!
+
+---
+
+## ⚙️ Complete Configuration Reference
+
+Add or customize these settings in your VS Code `settings.json`:
 
 ```jsonc
 {
-  // Enable or disable the entire provider
+  // --- Master Provider Settings ---
   "customLlmProvider.enabled": true,
-
-  // Base URL of your API (no trailing slash, no /v1)
   "customLlmProvider.endpoint": "http://localhost:20128",
-
-  // API key (leave empty if not needed)
   "customLlmProvider.apiKey": "",
-
-  // Auto-refresh interval in minutes (0 = disabled)
   "customLlmProvider.autoRefreshInterval": 0,
 
-  // Extra model IDs to register even if not in /v1/models
-  "customLlmProvider.additionalModels": [
-    "my-local-model"
-  ],
+  // Additional model IDs to register if not automatically returned by /v1/models
+  "customLlmProvider.additionalModels": ["my-custom-model"],
+  "customLlmProvider.includeModels": [],
+  "customLlmProvider.excludeModels": [],
 
-  // Proxy URL (empty = direct connection)
+  // Proxy URL (leave empty for direct connection)
   "customLlmProvider.proxyUrl": "",
 
-  // Sampling defaults
-  "customLlmProvider.defaultTemperature": 1.0,
-  "customLlmProvider.defaultTopP": 1.0,
-
-  // Stream timeout in ms (0 = no timeout)
+  // Stream timeout in milliseconds (0 = no timeout)
   "customLlmProvider.streamTimeout": 120000,
 
-  // Model aliases: alias -> target model ID
+  // Model Aliases: alias -> target model ID
   "customLlmProvider.modelAliases": {
     "fast": "qwen2.5-coder:latest",
-    "big": "deepseek-r1:7b"
+    "reasoning": "deepseek-r1:7b"
   },
 
-  // Default capabilities applied to all models (fallback)
-  "customLlmProvider.maxInputTokens": 160000,
-  "customLlmProvider.maxOutputTokens": 32000,
-  "customLlmProvider.requestDelay": 1000,
-  "customLlmProvider.toolCalling": true,
-  "customLlmProvider.toolFlavor": "openai-tools", // "openai-tools" | "openai-functions" | "text-based"
-  "customLlmProvider.vision": false,
-  "customLlmProvider.thinking": true,
-  "customLlmProvider.reasoning": true,
-  "customLlmProvider.reasoningEffort": "medium", // "low" | "medium" | "high"
-
-  // --- Auto-Retry Configuration ---
-  // Max retries for failed API requests (0 = disabled)
-  "customLlmProvider.maxRetries": 3,
-
-  // Base delay (ms) between retry attempts
-  "customLlmProvider.retryDelay": 1000,
-
-  // Backoff strategy: "fixed" | "linear" | "exponential"
-  "customLlmProvider.retryBackoff": "exponential",
-
-  // HTTP status codes that trigger a retry
-  "customLlmProvider.retryOnStatus": [429, 500, 502, 503, 504],
-
-  // Per-model overrides (partial — only what differs from fallback)
+  // Per-model capability overrides (keys are model IDs, values override fallbacks)
   "customLlmProvider.modelOverrides": {
-    "llava-1.6": {
-      "vision": true
-    },
-    "qwen2.5-coder-32b": {
+    "qwen2.5-coder:32b": {
       "maxOutputTokens": 8192,
       "toolCalling": true,
       "reasoning": false
     }
   },
 
-  // Additional OpenAI-compatible endpoints with unique model prefixes
+  // Default capabilities (fallback for all models)
+  "customLlmProvider.maxInputTokens": 160000,
+  "customLlmProvider.maxOutputTokens": 32000,
+  "customLlmProvider.requestDelay": 1000,
+  "customLlmProvider.defaultTemperature": 1.0,
+  "customLlmProvider.defaultTopP": 1.0,
+  "customLlmProvider.toolCalling": true,
+  "customLlmProvider.toolFlavor": "openai-tools", // "openai-tools" | "openai-functions" | "text-based"
+  "customLlmProvider.vision": false,
+  "customLlmProvider.thinking": true,
+  "customLlmProvider.reasoning": true,
+  "customLlmProvider.reasoningEffort": "medium",
+
+  // --- Auto-Retry Settings ---
+  "customLlmProvider.maxRetries": 3,
+  "customLlmProvider.retryDelay": 1000,
+  "customLlmProvider.retryBackoff": "exponential", // "fixed" | "linear" | "exponential"
+  "customLlmProvider.retryOnStatus": [429, 500, 502, 503, 504],
+
+  // --- Additional Endpoints (Multi-Provider) ---
   "customLlmProvider.additionalEndpoints": [
     {
       "id": "ollama",
       "url": "http://localhost:11434",
       "apiKey": "",
       "enabled": true,
-      "includeModels": ["llama3*", "qwen2.5-coder*"],
+      "includeModels": ["qwen2.5-coder*"],
       "excludeModels": [],
-      "additionalModels": ["deepseek-r1:7b"],
-      "modelOverrides": {
-        "qwen2.5-coder:latest": {
-          "maxInputTokens": 32000,
-          "toolCalling": true
-        }
-      }
+      "additionalModels": [],
+      "modelOverrides": {}
     }
   ],
 
-  // --- Inline Completion (Auto-Complete) Configuration ---
-  // Enable inline code completion (auto-complete) using custom LLM provider
-  "customLlmProvider.inlineCompletion.enabled": false,
+  // --- VS Code Master Setting (Required for Ghost Text) ---
+  "editor.inlineSuggest.enabled": true,
 
-  // Base URL of the OpenAI-compatible API for completions (falls back to primary endpoint if empty)
+  // --- Inline Completion (Ghost Text Auto-Complete) Settings ---
+  "customLlmProvider.inlineCompletion.enabled": true,
+
+  // Base URL (falls back to primary customLlmProvider.endpoint if empty "")
   "customLlmProvider.inlineCompletion.endpoint": "",
 
-  // API Key for authorization (falls back to primary apiKey if empty)
+  // API Key (falls back to primary customLlmProvider.apiKey if empty "")
   "customLlmProvider.inlineCompletion.apiKey": "",
 
-  // Model ID to use for inline completion (e.g. "qwen2.5-coder:1.5b")
-  "customLlmProvider.inlineCompletion.model": "qwen2.5-coder:1.5b",
+  // Target Model ID (Required for inline completion)
+  "customLlmProvider.inlineCompletion.model": "qwen2.5-coder:7b",
 
-  // Completion mode: "chat-fim" (Instruct FIM), "completions-fim" (Raw FIM), "forward-only" (Chat continuation)
+  // Completion Mode:
+  // - "chat-fim"        : Instruct-based Fill-in-the-Middle (/v1/chat/completions)
+  // - "completions-fim" : Raw FIM prompt (/v1/completions)
+  // - "forward-only"    : Chat continuation (/v1/chat/completions)
   "customLlmProvider.inlineCompletion.mode": "chat-fim",
 
-  // Delay (ms) to wait before triggering API requests after user stops typing
+  // Enable/Disable SSE Streaming mode (set false if your API endpoint doesn't support stream)
+  "customLlmProvider.inlineCompletion.useStreaming": true,
+
+  // Typing debounce delay in milliseconds before sending API requests
   "customLlmProvider.inlineCompletion.debounceDelay": 400,
 
-  // Maximum number of lines around the cursor (before/after) to send as context
+  // Maximum context lines around cursor (before and after)
   "customLlmProvider.inlineCompletion.maxContextLines": 100
 }
 ```
 
-## Commands
+---
+
+## 🛠️ Commands
 
 | Command | Description |
-|---------|-------------|
-| `Custom LLM: Refresh Models` | Re-fetch and re-register all models now |
-| `Custom LLM: Show Provider Status` | Show status of registered models in a Quick Pick and print log to Output panel |
-| `Custom LLM: Setup Wizard` | Interactive setup wizard to configure endpoint and API Key |
-| `Custom LLM: Open Dashboard` | Open the Webview dashboard showing stats and registered models |
-| *Status bar click* | Click the status bar to instantly refresh models |
+|---|---|
+| `Custom LLM: Refresh Models` | Re-fetch and re-register all chat models immediately |
+| `Custom LLM: Show Provider Status` | Display Quick Pick status and detailed info of all registered models |
+| `Custom LLM: Setup Wizard` | Launch the interactive guided setup wizard |
+| `Custom LLM: Open Dashboard` | Open the Webview Dashboard tab |
+| *Status Bar Click* | Click status bar item to instantly refresh models |
 
-## How It Works
+---
 
-1. On activation (`onLanguageModelChat`), the extension calls `GET /v1/models`
-2. Each returned model ID is registered via `vscode.lm.registerChatModelProvider`
-3. When Copilot Chat sends a request, the extension streams `POST /v1/chat/completions` using SSE
-4. Tool calls, vision, and reasoning are conditionally enabled based on capabilities config
-5. On HTTP failure (configurable status codes) or network error, the request is automatically retried with the configured backoff delay — retry only occurs if no content has been streamed yet, avoiding duplicate output
+## 🔍 How Inline Completion Works (Intelligence Flow)
 
-## Building
-
-```bash
-npm install
-npm run compile
-npx vsce package   # produces custom-llm-provider-1.0.0.vsix
+```mermaid
+flowchart TD
+    A[User Types in VS Code Editor] --> B{editor.inlineSuggest.enabled == true?}
+    B -- No --> C[VS Code Aborts Trigger]
+    B -- Yes --> D{Phase 1A: Local Cache Hit?}
+    D -- Yes --> E[⚡ Serve Ghost Text Instantly < 1ms]
+    D -- No --> F[Debounce Timer 400ms]
+    F --> G[Phase 1B: Detect Cursor Position Single vs Multi-line]
+    G --> H[Phase 2: Extract Open Tabs Context via Jaccard Similarity]
+    H --> I[Phase 3: AST Resolve Imported Types/Definitions]
+    I --> J[Build Prompt & Flexible Endpoint URL]
+    J --> K{customLlmProvider.inlineCompletion.useStreaming?}
+    K -- true --> L[HTTP SSE Stream Request + TTFT Metric + Early Abort]
+    K -- false --> M[Standard HTTP POST Non-streaming Request]
+    L --> N[Phase 1C: Clean Suffix Overlap & Strip Duplicates]
+    M --> N
+    N --> O[Render Ghost Text in Editor]
 ```
 
-Then install: `Extensions → ··· → Install from VSIX`
+---
+
+## 📦 Building & Development
+
+### Prerequisites
+- Node.js >= 18
+- VS Code >= 1.90
+
+### Compile & Package VSIX
+```bash
+# Install dependencies
+npm install
+
+# Build & bundle with esbuild
+npm run compile
+
+# Package extension into .vsix file
+npx vsce package
+```
+
+### Install locally in VS Code:
+1. Open Extensions view (`Ctrl+Shift+X`).
+2. Click the `...` menu in top right.
+3. Select **Install from VSIX...** and pick the generated `.vsix` file.
+
+---
+
+## 📄 License
+MIT License. Created for seamless custom LLM integration in VS Code & Copilot Chat.

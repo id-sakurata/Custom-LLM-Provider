@@ -2,11 +2,11 @@
   "name": "custom-llm-provider",
   "displayName": "Custom LLM Provider for Copilot Chat",
   "description": "Custom LLM provider that auto-fetches models from OpenAI-compatible endpoints",
-  "version": "1.0.7",
-  "publisher": "custom",
+  "version": "1.0.8",
+  "publisher": "id-sakurata",
   "repository": {
     "type": "git",
-    "url": "https://github.com/custom/custom-llm-provider"
+    "url": "https://github.com/id-sakurata/Custom-LLM-Provider.git"
   },
   "license": "MIT",
   "engines": {
@@ -17,9 +17,14 @@
     "Chat"
   ],
   "keywords": [
+    "language-models",
+    "language-model",
     "copilot",
     "chat",
     "llm",
+    "inline-completion",
+    "autocomplete",
+    "ghost-text",
     "custom",
     "provider"
   ],
@@ -36,7 +41,25 @@
     "languageModelChatProviders": [
       {
         "vendor": "custom-llm",
-        "displayName": "Custom LLM (OpenAI-compatible)"
+        "displayName": "Custom LLM (OpenAI-compatible)",
+        "when": "config.customLlmProvider.enabled",
+        "configurationCommand": "customLlmProvider.setupWizard",
+        "configuration": {
+          "type": "object",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "title": "Endpoint URL",
+              "description": "Enter the base URL of your OpenAI-compatible API (e.g., http://localhost:11434 or http://localhost:20128)"
+            },
+            "apiKey": {
+              "type": "string",
+              "title": "API Key",
+              "description": "Enter your API key for authentication (leave empty if not required)",
+              "secret": false
+            }
+          }
+        }
       }
     ],
     "commands": [
@@ -372,6 +395,11 @@
           "type": "number",
           "default": 100,
           "description": "Maximum number of lines around the cursor (before and after) to send as context."
+        },
+        "customLlmProvider.inlineCompletion.useStreaming": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable streaming mode for inline completion. Set to false if your endpoint does not support SSE streaming for completions."
         }
       }
     }

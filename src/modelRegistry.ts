@@ -63,6 +63,20 @@ export class ModelRegistry implements vscode.Disposable {
         _options: vscode.PrepareLanguageModelChatModelOptions,
         _token: vscode.CancellationToken
       ): vscode.ProviderResult<vscode.LanguageModelChatInformation[]> {
+        if (self.registeredModels.size === 0) {
+          const endpoint = ConfigManager.endpoint;
+          if (!endpoint || endpoint === 'http://localhost:20128') {
+            vscode.window.showInformationMessage(
+              'Custom LLM Provider: No models configured. Click Setup Wizard to configure endpoint & API Key.',
+              'Open Setup Wizard'
+            ).then((sel) => {
+              if (sel === 'Open Setup Wizard') {
+                vscode.commands.executeCommand('customLlmProvider.setupWizard');
+              }
+            });
+          }
+        }
+
         return Array.from(self.registeredModels.values()).map((m) => ({
           id: m.id,
           name: m.id,

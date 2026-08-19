@@ -48,8 +48,8 @@ interface ChatCompletionChunk {
  * Handles chat requests and responses between VS Code and the LLM endpoint.
  */
 export class ChatHandler {
-  private static lastRequestPromise: Promise<void> = Promise.resolve();
-  private static lastRequestTime = 0;
+  private static lastRequestPromises = new Map<string, Promise<void>>();
+  private static lastRequestTimes = new Map<string, number>();
   private startedThinking = false;
 
   // Shared agents for persistent connections (Keep-Alive)
@@ -65,7 +65,7 @@ export class ChatHandler {
 
   /**
    * Sends a chat request to the configured endpoint and yields response parts.
-   * Uses a static queue to prevent race conditions and enforce request delays.
+   * Uses a per-model queue to prevent race conditions and enforce request delays without blocking other models.
    */
   async *sendRequest(
     messages: readonly vscode.LanguageModelChatRequestMessage[],
@@ -73,17 +73,21 @@ export class ChatHandler {
     modelId: string,
     token: vscode.CancellationToken
   ): AsyncIterable<vscode.LanguageModelResponsePart> {
-    // Enqueue our request and update the global promise atomically before any await context switch
+    const queueKey = `${this.chatEndpoint}:${modelId}`;
     let currentRequestResolver!: () => void;
-    const previousPromise = ChatHandler.lastRequestPromise;
-    ChatHandler.lastRequestPromise = new Promise((resolve) => {
-      currentRequestResolver = resolve;
-    });
+    const previousPromise = ChatHandler.lastRequestPromises.get(queueKey) ?? Promise.resolve();
+    
+    ChatHandler.lastRequestPromises.set(
+      queueKey,
+      new Promise((resolve) => {
+        currentRequestResolver = resolve;
+      })
+    );
 
     try {
-      // Wait for the previous request in the global queue to finish its critical section
+      // Wait for previous request to the SAME model to finish
       await previousPromise;
-      await this.applyRequestDelay();
+      await this.applyRequestDelay(queueKey);
 
       const oaiMessages = this.convertMessages(messages);
       const translated = ToolAdapter.translate(tools, this.capabilities.toolFlavor);
@@ -172,15 +176,18 @@ export class ChatHandler {
   }
 
   /**
-   * Enforces a delay between requests to comply with API rate limits/cooldowns.
+   * Enforces a delay between requests to comply with API rate limits/cooldowns for a specific model queue.
    */
-  private async applyRequestDelay(): Promise<void> {
+  private async applyRequestDelay(queueKey: string): Promise<void> {
     const delay = this.capabilities.requestDelay;
+    const lastTime = ChatHandler.lastRequestTimes.get(queueKey) ?? 0;
+    
     if (delay <= 0) {
-      ChatHandler.lastRequestTime = Date.now();
+      ChatHandler.lastRequestTimes.set(queueKey, Date.now());
       return;
     }
-    const elapsed = Date.now() - ChatHandler.lastRequestTime;
+    
+    const elapsed = Date.now() - lastTime;
     if (elapsed < delay) {
       const waitTime = delay - elapsed;
       if (waitTime > 1000) {
@@ -206,7 +213,7 @@ export class ChatHandler {
         await new Promise<void>((r) => setTimeout(r, waitTime));
       }
     }
-    ChatHandler.lastRequestTime = Date.now();
+    ChatHandler.lastRequestTimes.set(queueKey, Date.now());
   }
 
   /**
