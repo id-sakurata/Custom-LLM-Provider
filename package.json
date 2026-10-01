@@ -2,7 +2,7 @@
   "name": "custom-llm-provider",
   "displayName": "Custom LLM Provider for Copilot Chat",
   "description": "Custom LLM provider that auto-fetches models from OpenAI-compatible endpoints",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "publisher": "id-sakurata",
   "repository": {
     "type": "git",
@@ -400,6 +400,12 @@
           "type": "boolean",
           "default": true,
           "description": "Enable or disable streaming mode for inline completion. Set to false if your endpoint does not support SSE streaming for completions."
+        },
+        "customLlmProvider.inlineCompletion.timeout": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 1000,
+          "description": "Maximum time in milliseconds to wait for an inline completion response before aborting the request."
         }
       }
     }

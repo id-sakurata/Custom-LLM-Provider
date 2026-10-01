@@ -166,4 +166,11 @@ export class ConfigManager {
   static get inlineCompletionUseStreaming(): boolean {
     return this.cfg().get<boolean>('inlineCompletion.useStreaming', true);
   }
+
+  /**
+   * Maximum time in milliseconds to wait for an inline completion response.
+   */
+  static get inlineCompletionTimeout(): number {
+    return this.cfg().get<number>('inlineCompletion.timeout', 5000);
+  }
 }
